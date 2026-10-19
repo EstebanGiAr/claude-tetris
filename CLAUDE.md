@@ -27,8 +27,8 @@ Then verify changes by opening the page in a browser and playing — there are n
 
 Three files, all logic lives in `game.js`:
 
-- `index.html` — DOM structure: main `<canvas id="board">` (300×600, i.e. COLS×BLOCK by ROWS×BLOCK), a side panel (score/lines/level/combo/goal/next-piece preview canvas/theme+sound toggles/controls), a hidden overlay div reused for both "PAUSE" and "GAME OVER"/"WIN"/"TIMEOUT" states, and a visible-by-default `#menu-overlay` (mode-select menu) shown on load and via `Esc`/`#menu-btn`.
-- `style.css` — dark/retro arcade visual theme.
+- `index.html` — DOM structure: main `<canvas id="board">` (300×600 internally, i.e. COLS×BLOCK by ROWS×BLOCK — scaled on-screen by CSS via `--board-h`/`height: var(--board-h); width: auto`, so the drawing logic stays untouched while it fits the viewport), a side panel (always-visible `.stats` grid for score/lines/level/combo, energy bar, goal, next-piece preview canvas, hold/queue canvases, theme+sound toggles, plus five `<details class="panel-section legend ...">` collapsed-by-default blocks for controls/abilities/powerups/combo-bonuses/special-pieces), a hidden overlay div reused for both "PAUSE" and "GAME OVER"/"WIN"/"TIMEOUT" states, and a visible-by-default `#menu-overlay` (mode-select menu) shown on load and via `Esc`/`#menu-btn`.
+- `style.css` — dark/retro arcade visual theme; `body` is capped to `100dvh` with `overflow: hidden` so the page never scrolls, `--board-h` (root CSS var) sizes the canvas and panel to fit the viewport height, and `.panel` is the only element allowed to scroll internally (when legend `<details>` are expanded).
 - `game.js` — entire game, no modules/classes, all top-level functions and module-scoped mutable state (`board`, `current`, `next`, `score`, `lines`, `level`, `paused`, `gameOver`, `dropAccum`, `dropInterval`, `animId`, `challenge`, `elapsed`, `settled`, etc.).
 
 Key mechanics to know before touching `game.js`:

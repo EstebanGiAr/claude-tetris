@@ -14,22 +14,11 @@
       <canvas id="board" width="300" height="600"></canvas>
 
       <aside class="panel">
-        <div class="panel-section">
-          <span class="label">SCORE</span>
-          <span class="value" id="score">0</span>
-        </div>
-        <div class="panel-section">
-          <span class="label">LINES</span>
-          <span class="value" id="lines">0</span>
-        </div>
-        <div class="panel-section">
-          <span class="label">LEVEL</span>
-          <span class="value" id="level">1</span>
-        </div>
-
-        <div class="panel-section">
-          <span class="label">COMBO</span>
-          <span class="value combo hidden" id="combo">x2</span>
+        <div class="panel-section stats">
+          <div class="stat"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
+          <div class="stat"><span class="label">LINES</span><span class="value" id="lines">0</span></div>
+          <div class="stat"><span class="label">LEVEL</span><span class="value" id="level">1</span></div>
+          <div class="stat"><span class="label">COMBO</span><span class="value combo hidden" id="combo">x2</span></div>
         </div>
 
         <div class="panel-section">
@@ -63,50 +52,8 @@
           <button id="sound-toggle" type="button" aria-label="Silenciar sonido">🔊 Sonido</button>
         </div>
 
-        <div class="panel-section bonuses abilities">
-          <span class="label">HABILIDADES (barra llena)</span>
-          <ul>
-            <li>Visión: ve 5 piezas siguientes, 15s</li>
-            <li>Intercambio: cambia la pieza actual</li>
-            <li>Ralentizar: caída lenta durante 10s</li>
-            <li>Deshacer: revierte tu última jugada</li>
-          </ul>
-        </div>
-
-        <div class="panel-section powerups">
-          <span class="label">POWERUPS</span>
-          <ul>
-            <li><span class="pw-dot pw-bomb"></span> Bomba: destruye 3×3</li>
-            <li><span class="pw-dot pw-bolt"></span> Rayo: limpia fila+col</li>
-            <li><span class="pw-dot pw-dye"></span> Tinte: comodines</li>
-            <li><span class="pw-dot pw-gravity"></span> Gravedad: compacta</li>
-            <li><span class="pw-dot pw-freeze"></span> Congelar: pausa 5s</li>
-          </ul>
-        </div>
-
-        <div class="panel-section bonuses">
-          <span class="label">BONOS DE COMBO</span>
-          <ul>
-            <li>Combo: líneas seguidas multiplican x2, x3, x4…</li>
-            <li>T-spin: rotar la T en un hueco ajustado</li>
-            <li>B2B: dos Tetris o T-spins consecutivos (×1.5)</li>
-            <li>Perfect Clear: vaciar el tablero por completo</li>
-          </ul>
-        </div>
-
-        <div class="panel-section pieces">
-          <span class="label">PIEZAS ESPECIALES</span>
-          <ul>
-            <li><span class="pw-dot pw-nut"></span> Tuerca: anillo con hueco</li>
-            <li><span class="pw-dot pw-plus"></span> + : pentominó cruz</li>
-            <li><span class="pw-dot pw-u"></span> U : pentominó en U</li>
-            <li><span class="pw-dot pw-y"></span> Y : pentominó en Y</li>
-            <li><span class="pw-dot pw-single"></span> 1×1: recompensa tras Tetris</li>
-          </ul>
-        </div>
-
-        <div class="panel-section controls">
-          <span class="label">CONTROLS</span>
+        <details class="panel-section legend controls">
+          <summary class="label">CONTROLS</summary>
           <ul>
             <li><kbd>←</kbd><kbd>→</kbd> mover</li>
             <li><kbd>↑</kbd> rotar</li>
@@ -117,7 +64,49 @@
             <li><kbd>C</kbd> / <kbd>Shift</kbd> reservar pieza</li>
             <li><kbd>Esc</kbd> menú</li>
           </ul>
-        </div>
+        </details>
+
+        <details class="panel-section legend bonuses abilities">
+          <summary class="label">HABILIDADES (barra llena)</summary>
+          <ul>
+            <li>Visión: ve 5 piezas siguientes, 15s</li>
+            <li>Intercambio: cambia la pieza actual</li>
+            <li>Ralentizar: caída lenta durante 10s</li>
+            <li>Deshacer: revierte tu última jugada</li>
+          </ul>
+        </details>
+
+        <details class="panel-section legend powerups">
+          <summary class="label">POWERUPS</summary>
+          <ul>
+            <li><span class="pw-dot pw-bomb"></span> Bomba: destruye 3×3</li>
+            <li><span class="pw-dot pw-bolt"></span> Rayo: limpia fila+col</li>
+            <li><span class="pw-dot pw-dye"></span> Tinte: comodines</li>
+            <li><span class="pw-dot pw-gravity"></span> Gravedad: compacta</li>
+            <li><span class="pw-dot pw-freeze"></span> Congelar: pausa 5s</li>
+          </ul>
+        </details>
+
+        <details class="panel-section legend bonuses">
+          <summary class="label">BONOS DE COMBO</summary>
+          <ul>
+            <li>Combo: líneas seguidas multiplican x2, x3, x4…</li>
+            <li>T-spin: rotar la T en un hueco ajustado</li>
+            <li>B2B: dos Tetris o T-spins consecutivos (×1.5)</li>
+            <li>Perfect Clear: vaciar el tablero por completo</li>
+          </ul>
+        </details>
+
+        <details class="panel-section legend pieces">
+          <summary class="label">PIEZAS ESPECIALES</summary>
+          <ul>
+            <li><span class="pw-dot pw-nut"></span> Tuerca: anillo con hueco</li>
+            <li><span class="pw-dot pw-plus"></span> + : pentominó cruz</li>
+            <li><span class="pw-dot pw-u"></span> U : pentominó en U</li>
+            <li><span class="pw-dot pw-y"></span> Y : pentominó en Y</li>
+            <li><span class="pw-dot pw-single"></span> 1×1: recompensa tras Tetris</li>
+          </ul>
+        </details>
       </aside>
     </div>
 
