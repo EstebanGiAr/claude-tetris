@@ -1,0 +1,120 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # No correr si el autor es un bot, ni si el issue ya menciona a @claude
+    # (ese caso lo atiende el workflow claude.yml para no duplicar trabajo).
+    if: |
+      github.event.sender.type != 'Bot' &&
+      !contains(github.event.issue.title, '@claude') &&
+      !contains(github.event.issue.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Issue Triage
+        id: claude-triage
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          claude_args: '--allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh label list:*),Bash(gh label create:*),Bash(gh api:*)"'
+
+          prompt: |
+            Analiza el issue #${{ github.event.issue.number }} de este repositorio
+            (un Tetris en JavaScript/HTML5 Canvas, ver CLAUDE.md) y haz un triage
+            completo: etiquetas + diagnóstico técnico. Sigue estos pasos en orden:
+
+            1. Lee el issue completo:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,labels,comments`
+
+            2. Lee el catálogo de labels en `.github/labels.yml`. Lee las labels que
+               ya existen en el repo con `gh label list --limit 200`. Para cada
+               entrada del catálogo que todavía no exista en el repo, créala con:
+               `gh label create "<name>" --color "<color>" --description "<description>"`.
+               No crees ni uses ninguna label que no esté en `.github/labels.yml`.
+
+            3. Lee `CLAUDE.md` y el código fuente relevante (`game.js`, `index.html`,
+               `style.css`) para entender qué parte del juego describe el issue.
+               Usa Read/Grep/Glob — no ejecutes el juego. No inventes nombres de
+               funciones ni de variables: cita únicamente identificadores que
+               existan de verdad en el código, con referencias tipo `game.js:123`.
+
+            4. Decide las labels a aplicar, usando solo el catálogo de
+               `.github/labels.yml`:
+               - Exactamente un tipo (`bug`, `enhancement`, `question`, `docs`, `refactor`).
+               - Una o más áreas (`area:gameplay`, `area:rendering`, `area:ui`,
+                 `area:controls`, `area:scoring`, `area:ci`) según el código implicado.
+               - Exactamente una prioridad (`prio:alta`, `prio:media`, `prio:baja`).
+               - Exactamente un tamaño/complejidad (`size:xs`, `size:s`, `size:m`, `size:l`).
+               - Si el issue no da información suficiente para diagnosticar con
+                 confianza, añade también `needs-info` y dilo explícitamente en el
+                 diagnóstico (sección "Preguntas abiertas").
+               Aplica el resultado con `gh issue edit ${{ github.event.issue.number }}
+               --add-label "label1,label2,..."`. Si esta es una re-ejecución (el
+               issue fue editado) y alguna label del catálogo que pusiste antes ya
+               no aplica, quítala con `--remove-label`. No toques labels que no
+               pertenezcan a este catálogo.
+
+            5. Redacta el diagnóstico técnico con esta plantilla exacta (en
+               español, Markdown):
+
+               ```
+               <!-- claude-triage -->
+               ## 🔍 Diagnóstico automático
+
+               **Resumen** — qué se pide o qué falla, en 1-2 frases.
+
+               **Área afectada** — archivos, funciones y estado de game.js
+               implicados, con referencias `archivo:línea`.
+
+               **Causa probable / estado actual** — qué hace hoy el código y por
+               qué produce el síntoma descrito (o, si es una mejora, qué falta).
+
+               **Enfoque de solución propuesto** — pasos concretos de
+               implementación, reutilizando funciones/patrones ya existentes
+               cuando sea posible.
+
+               **Criterios de aceptación** — lista verificable. Este proyecto no
+               tiene tests automatizados, así que describe pasos de prueba manual
+               en el navegador.
+
+               **Riesgos y efectos colaterales** — qué otras mecánicas podrían
+               verse afectadas por el cambio.
+
+               **Preguntas abiertas** — solo si falta información; si no, omite
+               esta sección.
+
+               ---
+               *Generado automáticamente por Claude. Última actualización:
+               <fecha y hora UTC actuales>.*
+               ```
+
+            6. Publica el diagnóstico de forma idempotente: busca si ya existe un
+               comentario tuyo anterior que contenga el marcador
+               `<!-- claude-triage -->` con:
+               `gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments --jq '.[] | select(.body | contains("claude-triage")) | .id'`
+               - Si existe, actualízalo (no crees uno nuevo):
+                 `gh api --method PATCH repos/${{ github.repository }}/issues/comments/<id> -f body=@archivo_con_el_comentario.md`
+               - Si no existe, créalo:
+                 `gh issue comment ${{ github.event.issue.number }} --body-file archivo_con_el_comentario.md`
+               Escribe el cuerpo del comentario en un archivo temporal antes de
+               usarlo con `--body-file`/`-f body=@...` para evitar problemas de
+               escapado de comillas o saltos de línea.
+
+            No modifiques el título ni el cuerpo original del issue. No comentes
+            nada fuera de la plantilla anterior.

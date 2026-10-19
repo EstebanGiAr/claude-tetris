@@ -1,0 +1,71 @@
+# Catálogo de labels para el triage automático de issues (ver
+# .github/workflows/claude-issue-triage.yml). Claude solo asigna labels de este
+# archivo; si alguna no existe en el repo, la crea con el color y la
+# descripción indicados aquí.
+
+# --- Tipo (exactamente una por issue) ---
+- name: bug
+  color: "d73a4a"
+  description: "Algo no funciona como debería"
+- name: enhancement
+  color: "a2eeef"
+  description: "Nueva funcionalidad o mejora sobre algo existente"
+- name: question
+  color: "d876e3"
+  description: "Se necesita más información o una decisión antes de actuar"
+- name: docs
+  color: "0075ca"
+  description: "Cambios en README.md, CLAUDE.md u otra documentación"
+- name: refactor
+  color: "cfd3d7"
+  description: "Reorganizar o limpiar código existente sin cambiar comportamiento"
+
+# --- Área (una o más por issue, según el código de game.js afectado) ---
+- name: "area:gameplay"
+  color: "1d76db"
+  description: "Colisiones, rotación, wall kicks, caída, generación de piezas"
+- name: "area:rendering"
+  color: "5319e7"
+  description: "Dibujado en canvas, ghost piece, piezas y tablero"
+- name: "area:ui"
+  color: "fbca04"
+  description: "HTML/CSS, panel lateral, overlay de pausa/game over"
+- name: "area:controls"
+  color: "c2e0c6"
+  description: "Entrada de teclado, pausa, atajos"
+- name: "area:scoring"
+  color: "bfd4f2"
+  description: "Puntaje, líneas limpiadas, nivel y velocidad de caída"
+- name: "area:ci"
+  color: "006b75"
+  description: "GitHub Actions y automatizaciones del repositorio"
+
+# --- Prioridad (exactamente una por issue) ---
+- name: "prio:alta"
+  color: "b60205"
+  description: "Bloquea el juego o rompe una mecánica central"
+- name: "prio:media"
+  color: "e99695"
+  description: "Afecta la experiencia pero tiene workaround"
+- name: "prio:baja"
+  color: "c5def5"
+  description: "Mejora menor o cosmética, sin urgencia"
+
+# --- Complejidad estimada (exactamente una por issue) ---
+- name: "size:xs"
+  color: "c2e0c6"
+  description: "Cambio trivial, menos de ~10 líneas"
+- name: "size:s"
+  color: "bfe5bf"
+  description: "Cambio pequeño y acotado a una función"
+- name: "size:m"
+  color: "f9d0c4"
+  description: "Toca varias funciones o requiere revisar interacciones"
+- name: "size:l"
+  color: "f4a0a0"
+  description: "Cambio amplio o que requiere rediseñar una mecánica"
+
+# --- Estado ---
+- name: "needs-info"
+  color: "e4e669"
+  description: "Falta información para diagnosticar o implementar la solución"
