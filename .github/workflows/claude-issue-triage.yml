@@ -118,3 +118,8 @@ jobs:
 
             No modifiques el título ni el cuerpo original del issue. No comentes
             nada fuera de la plantilla anterior.
+
+            El comentario debe estar escrito en formato Markdown válido y
+            correctamente interpretable por GitHub (encabezados, listas,
+            negritas, bloques de código con comillas triples, etc.), ya que
+            se publicará directamente como comentario del issue.
