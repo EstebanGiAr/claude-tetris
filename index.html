@@ -32,6 +32,11 @@
           <span class="value combo hidden" id="combo">x2</span>
         </div>
 
+        <div class="panel-section">
+          <span class="label">ENERGÍA</span>
+          <div class="energy-bar"><div class="energy-fill" id="energy-fill"></div></div>
+        </div>
+
         <div class="panel-section hidden" id="goal-section">
           <span class="label">OBJETIVO</span>
           <span class="value goal" id="goal-text">0 / 40 líneas</span>
@@ -43,9 +48,30 @@
           <canvas id="next-canvas" width="120" height="120"></canvas>
         </div>
 
+        <div class="panel-section hidden" id="hold-section">
+          <span class="label">HOLD</span>
+          <canvas id="hold-canvas" width="80" height="80"></canvas>
+        </div>
+
+        <div class="panel-section hidden" id="queue-section">
+          <span class="label">PRÓXIMAS (VISIÓN)</span>
+          <canvas id="queue-canvas" width="150" height="34"></canvas>
+        </div>
+
         <div class="panel-section">
           <button id="theme-toggle" type="button" aria-label="Cambiar tema">☀ Modo claro</button>
           <button id="sound-toggle" type="button" aria-label="Silenciar sonido">🔊 Sonido</button>
+        </div>
+
+        <div class="panel-section bonuses abilities">
+          <span class="label">HABILIDADES (barra llena)</span>
+          <ul>
+            <li>Visión: ve 5 piezas siguientes, 15s</li>
+            <li>Intercambio: cambia la pieza actual</li>
+            <li>Ralentizar: caída lenta durante 10s</li>
+            <li>Deshacer: revierte tu última jugada</li>
+            <li>Reserva: desbloquea hold (tecla C)</li>
+          </ul>
         </div>
 
         <div class="panel-section powerups">
@@ -89,6 +115,7 @@
             <li><kbd>Space</kbd> caída</li>
             <li><kbd>P</kbd> pausa</li>
             <li><kbd>M</kbd> sonido</li>
+            <li><kbd>C</kbd> hold (tras desbloquear)</li>
             <li><kbd>Esc</kbd> menú</li>
           </ul>
         </div>
@@ -112,6 +139,14 @@
       <div class="overlay-box menu-box">
         <p id="menu-title">ELIGE MODO</p>
         <div id="menu-list"></div>
+      </div>
+    </div>
+
+    <div id="ability-overlay" class="overlay hidden">
+      <div class="overlay-box menu-box">
+        <p id="ability-title">¡HABILIDAD LISTA!</p>
+        <p class="ability-sub">Elige una (1-5)</p>
+        <div id="ability-list"></div>
       </div>
     </div>
   </div>

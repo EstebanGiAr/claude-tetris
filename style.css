@@ -243,6 +243,52 @@ kbd {
 .pw-y      { background: #4fc3f7; }
 .pw-single { background: #ffee58; }
 
+/* ---- Energía / habilidades ---- */
+.energy-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.energy-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.energy-fill.full {
+  background: var(--danger);
+}
+
+#hold-section.hidden,
+#queue-section.hidden {
+  display: none;
+}
+
+#hold-canvas,
+#queue-canvas {
+  display: block;
+  border: 1px solid var(--border);
+  background: var(--canvas-bg);
+  border-radius: 4px;
+}
+
+#ability-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+.ability-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ---- Objetivo (modo desafío) ---- */
 #goal-section.hidden {
   display: none;
@@ -342,7 +388,8 @@ kbd {
   color: var(--accent);
 }
 
-#menu-list {
+#menu-list,
+#ability-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
