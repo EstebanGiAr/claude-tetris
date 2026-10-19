@@ -33,8 +33,8 @@ Three files, all logic lives in `game.js`:
 
 Key mechanics to know before touching `game.js`:
 
-- **Board model**: `ROWS × COLS` matrix; each cell is `0` (empty) or a piece-color index `1–7`.
-- **Pieces**: defined as square matrices in `PIECES`; rotation (`rotateCW`) is a transpose + row reversal, not a lookup table of rotation states.
+- **Board model**: `ROWS × COLS` matrix; each cell is `0` (empty) or a piece-color index `1–8`.
+- **Pieces**: defined as square matrices in `PIECES`; rotation (`rotateCW`) is a transpose + row reversal, not a lookup table of rotation states. Index `8` (`NUT`) is the "tuerca" challenge piece — a 3×3 ring with an empty center (`[[8,8,8],[8,0,8],[8,8,8]]`), rotation-invariant, drawn with the normal block color plus a dark circle (`drawNutHole`) over the hole; `isNutRing` finds already-settled holes on the board so they keep rendering after the piece locks.
 - **Collision** (`collide`): checks board bounds and existing fixed blocks.
 - **Wall kicks** (`tryRotate`): on rotation collision, tries horizontal offsets `[0, -1, 1, -2, 2]` before giving up on the rotation.
 - **Game loop** (`loop`): driven by `requestAnimationFrame`; accumulates `dt` and drops the piece one row once `dropAccum >= dropInterval`.

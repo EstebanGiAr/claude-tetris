@@ -35,6 +35,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 
 - Tablero de **10 × 20** celdas.
 - Las **7 piezas estándar** (I, O, T, S, Z, J, L) con colores diferenciados.
+- **Pieza reto: la tuerca** — un anillo 3×3 con el centro vacío. Aparece con la misma probabilidad que las demás (1 de 8) y, al encajar, deja un agujero imposible de rellenar hasta que se limpie esa línea.
 - **Rotación** con _wall kicks_ básicos (pequeños desplazamientos para que la pieza pueda rotar pegada a la pared).
 - **Soft drop** (bajada acelerada) y **hard drop** (caída instantánea).
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
@@ -109,8 +110,8 @@ Aporta el aspecto visual con estética _dark / retro arcade_: fondo oscuro, tipo
 
 Contiene toda la lógica del juego. A grandes rasgos:
 
-- **Modelo del tablero**: una matriz `ROWS × COLS` donde cada celda guarda `0` (vacía) o un índice de color (1–7) que identifica la pieza.
-- **Piezas**: definidas como matrices cuadradas. Para rotar se calcula la transposición + reverso de filas (`rotateCW`).
+- **Modelo del tablero**: una matriz `ROWS × COLS` donde cada celda guarda `0` (vacía) o un índice de color (1–8) que identifica la pieza.
+- **Piezas**: definidas como matrices cuadradas. Para rotar se calcula la transposición + reverso de filas (`rotateCW`). La tuerca (índice `8`, constante `NUT`) es un anillo 3×3 con el centro en `0`; como es simétrica, rota sin necesidad de ningún caso especial. Su agujero se dibuja aparte con `drawNutHole` (un círculo oscuro sobre el hueco), y `isNutRing` detecta los agujeros ya fijados en el tablero para seguir pintándolos tras encajar la pieza.
 - **Detección de colisiones** (`collide`): comprueba que ninguna celda de la pieza salga del tablero ni se solape con bloques ya fijados.
 - **Wall kicks** (`tryRotate`): si la rotación choca, intenta desplazar la pieza ±1 y ±2 columnas antes de descartar el giro.
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
