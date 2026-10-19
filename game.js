@@ -145,7 +145,9 @@ function spawn() {
   current = next;
   next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
+    // La pieza nueva no cabe: la partida termina aquí, sin seguir generando piezas.
     endGame();
+    return;
   }
   drawNext();
 }
@@ -219,8 +221,10 @@ function drawNext() {
 }
 
 function endGame() {
+  if (gameOver) return;
   gameOver = true;
   cancelAnimationFrame(animId);
+  animId = null;
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
@@ -241,6 +245,8 @@ function togglePause() {
 }
 
 function loop(ts) {
+  // Si ya no se está jugando (p.ej. un frame encolado llegó tarde), no seguir.
+  if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
   dropAccum += dt;
@@ -253,6 +259,7 @@ function loop(ts) {
     }
   }
   draw();
+  if (gameOver) return; // lockPiece() pudo terminar la partida: no programar otro frame.
   animId = requestAnimationFrame(loop);
 }
 
