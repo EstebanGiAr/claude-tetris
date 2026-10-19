@@ -173,15 +173,17 @@ kbd {
   color: var(--kbd-text);
 }
 
-/* ---- Leyenda de powerups ---- */
-.powerups ul {
+/* ---- Leyenda de powerups y piezas especiales ---- */
+.powerups ul,
+.pieces ul {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.powerups li {
+.powerups li,
+.pieces li {
   font-size: 11px;
   color: var(--muted);
   display: flex;
@@ -202,6 +204,12 @@ kbd {
 .pw-dye     { background: #f06292; }
 .pw-gravity { background: #4db6ac; }
 .pw-freeze  { background: #80d8ff; }
+
+.pw-nut    { background: #b0bec5; }
+.pw-plus   { background: #aed581; }
+.pw-u      { background: #9575cd; }
+.pw-y      { background: #4fc3f7; }
+.pw-single { background: #ffee58; }
 
 /* ---- Overlay ---- */
 .overlay {

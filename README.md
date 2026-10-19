@@ -36,6 +36,8 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - Tablero de **10 × 20** celdas.
 - Las **7 piezas estándar** (I, O, T, S, Z, J, L) con colores diferenciados.
 - **Pieza reto: la tuerca** — un anillo 3×3 con el centro vacío. Aparece con la misma probabilidad que las demás (1 de 8) y, al encajar, deja un agujero imposible de rellenar hasta que se limpie esa línea.
+- **Pentominós ocasionales** (`+`, `U`, `Y`, 5 bloques cada uno) — aparecen con un 12% de probabilidad en lugar de una pieza estándar, añadiendo dificultad puntual.
+- **Pieza 1×1 de recompensa** — tras limpiar un Tetris (4 líneas de una vez) la siguiente pieza es un bloque único, ideal para rellenar huecos estrechos.
 - **Rotación** con _wall kicks_ básicos (pequeños desplazamientos para que la pieza pueda rotar pegada a la pared).
 - **Soft drop** (bajada acelerada) y **hard drop** (caída instantánea).
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.

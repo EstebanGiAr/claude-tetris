@@ -19,6 +19,10 @@ const COLORS = [
   '#f06292', // tinte - rosa
   '#4db6ac', // gravedad - verde azulado
   '#80d8ff', // congelar - celeste hielo
+  '#aed581', // + (pentominó X) - verde lima
+  '#9575cd', // U (pentominó) - violeta
+  '#4fc3f7', // Y (pentominó) - celeste
+  '#ffee58', // single 1x1 - amarillo brillante
 ];
 
 const NUT = 8; // tipo de pieza "tuerca" (reto): anillo con agujero central
@@ -30,6 +34,11 @@ const POWERUP_NAMES = { 9: 'BOMBA', 10: 'RAYO', 11: 'TINTE', 12: 'GRAVEDAD', 13:
 const POWERUP_EVERY = 5; // líneas entre apariciones de powerups
 const FREEZE_MS = 5000;
 const TOAST_MS = 1800;
+
+// Pentominós (5 bloques) que aparecen ocasionalmente para añadir dificultad puntual.
+const PLUS = 14, U_PENT = 15, Y_PENT = 16, SINGLE = 17;
+const PENTOS = [PLUS, U_PENT, Y_PENT];
+const PENTO_CHANCE = 0.12; // probabilidad de que la pieza aleatoria sea un pentominó
 
 const PIECES = [
   null,
@@ -46,10 +55,14 @@ const PIECES = [
   [[11]],  // Tinte: convierte el color más abundante en comodines
   [[12]],  // Gravedad: compacta los huecos del tablero
   [[13]],  // Congelar: pausa la caída 5s
+  [[0,14,0],[14,14,14],[0,14,0]],                  // + (pentominó X), invariante a la rotación
+  [[15,0,15],[15,15,15],[0,0,0]],                  // U
+  [[0,16,0,0],[16,16,0,0],[0,16,0,0],[0,16,0,0]],  // Y
+  [[17]],  // Single: recompensa que llega tras un Tetris
 ];
 
 function isPowerup(type) {
-  return type >= BOMB;
+  return POWERUPS.includes(type);
 }
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
@@ -78,16 +91,22 @@ function createBoard() {
   return createMatrix(0);
 }
 
+function makePiece(type) {
+  const shape = PIECES[type].map(row => [...row]);
+  return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
 function randomPiece() {
   let type;
   if (pendingPowerup) {
     pendingPowerup = false;
     type = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
+  } else if (Math.random() < PENTO_CHANCE) {
+    type = PENTOS[Math.floor(Math.random() * PENTOS.length)];
   } else {
     type = Math.floor(Math.random() * 8) + 1;
   }
-  const shape = PIECES[type].map(row => [...row]);
-  return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+  return makePiece(type);
 }
 
 function collide(shape, ox, oy) {
@@ -175,6 +194,10 @@ function clearLines() {
       pendingPowerup = true;
       nextPowerupAt += POWERUP_EVERY;
     }
+    if (cleared === 4) {
+      next = makePiece(SINGLE); // recompensa: la pieza en cola pasa a ser el single 1x1
+      showToast('¡TETRIS! PIEZA 1×1');
+    }
     updateHUD();
   }
 }
@@ -260,7 +283,7 @@ function bolt(x, y) {
 
 // Tinte: el color más abundante del tablero se convierte en comodines frágiles.
 function dye() {
-  const counts = new Array(9).fill(0);
+  const counts = new Array(COLORS.length).fill(0);
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
       if (board[r][c] && board[r][c] !== NUT) counts[board[r][c]]++;
