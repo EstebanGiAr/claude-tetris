@@ -32,6 +32,12 @@
           <span class="value combo hidden" id="combo">x2</span>
         </div>
 
+        <div class="panel-section hidden" id="goal-section">
+          <span class="label">OBJETIVO</span>
+          <span class="value goal" id="goal-text">0 / 40 líneas</span>
+          <span class="value goal-timer" id="goal-timer">2:00</span>
+        </div>
+
         <div class="panel-section">
           <span class="label">NEXT</span>
           <canvas id="next-canvas" width="120" height="120"></canvas>
@@ -83,6 +89,7 @@
             <li><kbd>Space</kbd> caída</li>
             <li><kbd>P</kbd> pausa</li>
             <li><kbd>M</kbd> sonido</li>
+            <li><kbd>Esc</kbd> menú</li>
           </ul>
         </div>
       </aside>
@@ -93,7 +100,18 @@
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
         <p id="overlay-combo"></p>
-        <button id="restart-btn">Reiniciar</button>
+        <p id="overlay-record"></p>
+        <div class="overlay-actions">
+          <button id="restart-btn">Reiniciar</button>
+          <button id="menu-btn">Menú</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="menu-overlay" class="overlay">
+      <div class="overlay-box menu-box">
+        <p id="menu-title">ELIGE MODO</p>
+        <div id="menu-list"></div>
       </div>
     </div>
   </div>

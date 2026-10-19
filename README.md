@@ -17,6 +17,7 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
     - [Opción 1: abrir el archivo directamente](#opción-1-abrir-el-archivo-directamente)
     - [Opción 2: servidor local (recomendado)](#opción-2-servidor-local-recomendado)
   - [Controles](#controles)
+  - [Modo desafío](#modo-desafío)
   - [Cómo funciona](#cómo-funciona)
     - [1. `index.html`](#1-indexhtml)
     - [2. `style.css`](#2-stylecss)
@@ -46,6 +47,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Modo combo y multiplicadores**: limpiar líneas en turnos consecutivos encadena un combo (x2, x3, x4…) que multiplica la puntuación; además hay bonus por **T-spin**, por **Back-to-Back** (dos Tetris o T-spins consecutivos) y por **Perfect Clear** (dejar el tablero totalmente vacío). Cada encadenado dispara un flash de color, una vibración de pantalla y un sonido generado con Web Audio (silenciable con `M`).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Modo desafío** con 5 retos de objetivo y tiempo (ver [Modo desafío](#modo-desafío)), con récords guardados en `localStorage`.
 
 ---
 
@@ -90,6 +92,24 @@ Después abre `http://localhost:8000` en el navegador.
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
 | `M`       | Silenciar / activar sonido        |
+| `Esc`     | Volver al menú de modos           |
+| `1`–`6`   | Elegir modo en el menú            |
+
+---
+
+## Modo desafío
+
+Al cargar la página aparece un menú para elegir entre **CLÁSICO** (el modo libre descrito arriba) y 5 desafíos con objetivo y condición de victoria. Dentro de un desafío no aparecen powerups, pentominós ni la tuerca (solo las 7 piezas estándar), para que el reto sea medible y justo.
+
+| Desafío               | Objetivo                                             |
+| ---------------------- | ----------------------------------------------------- |
+| **40 líneas**           | Limpiar 40 líneas antes de que se agoten los 2 minutos. |
+| **Basura ascendente**   | Sobrevivir 90 s mientras sube una fila de basura (con un hueco) cada 10 s. |
+| **Tablero sucio**       | Limpiar 20 líneas partiendo de 8 filas pre-colocadas con huecos. |
+| **Piezas invisibles**   | Limpiar 15 líneas mientras los bloques fijos se desvanecen poco después de asentarse (vuelven a verse un instante tras cada línea limpiada). |
+| **Rotación inversa**    | Limpiar 30 líneas; desde el nivel 3 la rotación gira al revés. |
+
+Al terminar un desafío (ganado, perdido o por tiempo agotado) se muestra el resultado y, si corresponde, el récord guardado en `localStorage` (mejor tiempo de completado, o mayor tiempo sobrevivido en "Basura ascendente"). Desde el overlay de fin de partida se puede reintentar el mismo modo o volver al menú con el botón **Menú** o la tecla `Esc`.
 
 ---
 

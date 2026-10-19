@@ -243,6 +243,20 @@ kbd {
 .pw-y      { background: #4fc3f7; }
 .pw-single { background: #ffee58; }
 
+/* ---- Objetivo (modo desafío) ---- */
+#goal-section.hidden {
+  display: none;
+}
+
+.value.goal {
+  font-size: 15px;
+}
+
+.value.goal-timer {
+  font-size: 20px;
+  color: var(--danger);
+}
+
 /* ---- Overlay ---- */
 .overlay {
   position: absolute;
@@ -275,14 +289,21 @@ kbd {
 }
 
 #overlay-score,
-#overlay-combo {
+#overlay-combo,
+#overlay-record {
   font-family: 'Courier New', Courier, monospace;
   font-size: 14px;
   color: var(--accent);
 }
 
-#restart-btn {
+.overlay-actions {
+  display: flex;
+  gap: 10px;
   margin-top: 8px;
+}
+
+#restart-btn,
+#menu-btn {
   background: var(--accent);
   color: var(--accent-contrast);
   border: none;
@@ -295,6 +316,72 @@ kbd {
   transition: background 0.15s;
 }
 
+#menu-btn {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+}
+
 #restart-btn:hover {
   background: var(--accent-hover);
+}
+
+#menu-btn:hover {
+  border-color: var(--accent);
+}
+
+/* ---- Menú de modos/desafíos ---- */
+.menu-box {
+  max-width: 280px;
+}
+
+#menu-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+
+#menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.menu-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  background: var(--kbd-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.menu-card:hover,
+.menu-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.menu-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+.menu-card-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.menu-card-record {
+  font-size: 11px;
+  color: var(--accent);
 }

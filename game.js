@@ -23,6 +23,7 @@ const COLORS = [
   '#9575cd', // U (pentominó) - violeta
   '#4fc3f7', // Y (pentominó) - celeste
   '#ffee58', // single 1x1 - amarillo brillante
+  '#757575', // basura (modo desafío) - gris oscuro
 ];
 
 const NUT = 8; // tipo de pieza "tuerca" (reto): anillo con agujero central
@@ -39,6 +40,40 @@ const TOAST_MS = 1800;
 const PLUS = 14, U_PENT = 15, Y_PENT = 16, SINGLE = 17;
 const PENTOS = [PLUS, U_PENT, Y_PENT];
 const PENTO_CHANCE = 0.12; // probabilidad de que la pieza aleatoria sea un pentominó
+
+const GARBAGE = 18; // color de las filas de basura del modo desafío "garbage"
+
+// --- Modo desafío (ver CLAUDE.md) ---
+// Cada entrada es puro dato: nombre/descripción para el menú y las reglas que
+// activan sus mecánicas (goalLines, timeLimit, surviveMs, garbageEvery,
+// prefillRows, invisible, reverseFromLevel). `extras: true` reactivaría
+// powerups/pentominós/tuerca dentro del reto; por defecto están desactivados.
+const CHALLENGES = [
+  {
+    id: 'sprint', name: '40 LÍNEAS', desc: 'Limpia 40 líneas antes de 2:00',
+    goalLines: 40, timeLimit: 120000,
+  },
+  {
+    id: 'garbage', name: 'BASURA ASCENDENTE', desc: 'Sobrevive 90s: sube una fila de basura cada 10s',
+    surviveMs: 90000, garbageEvery: 10000,
+  },
+  {
+    id: 'prefill', name: 'TABLERO SUCIO', desc: 'Limpia 20 líneas partiendo de 8 filas pre-colocadas',
+    goalLines: 20, prefillRows: 8,
+  },
+  {
+    id: 'invisible', name: 'PIEZAS INVISIBLES', desc: 'Los bloques se ocultan al asentarse: limpia 15 líneas',
+    goalLines: 15, invisible: true,
+  },
+  {
+    id: 'reverse', name: 'ROTACIÓN INVERSA', desc: 'Desde el nivel 3 la rotación se invierte: limpia 30 líneas',
+    goalLines: 30, reverseFromLevel: 3,
+  },
+];
+
+const FADE_DELAY = 400; // ms antes de que un bloque fijo empiece a desvanecerse (reto "invisible")
+const FADE_MS = 900;    // ms que tarda en desaparecer del todo
+const REVEAL_MS = 600;  // respiro visible tras limpiar una línea en el reto "invisible"
 
 const PIECES = [
   null,
@@ -83,11 +118,18 @@ const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
 const comboEl = document.getElementById('combo');
+const goalSection = document.getElementById('goal-section');
+const goalText = document.getElementById('goal-text');
+const goalTimer = document.getElementById('goal-timer');
 const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const overlayCombo = document.getElementById('overlay-combo');
+const overlayRecord = document.getElementById('overlay-record');
 const restartBtn = document.getElementById('restart-btn');
+const menuBtn = document.getElementById('menu-btn');
+const menuOverlay = document.getElementById('menu-overlay');
+const menuList = document.getElementById('menu-list');
 const themeToggle = document.getElementById('theme-toggle');
 const soundToggle = document.getElementById('sound-toggle');
 
@@ -96,6 +138,7 @@ let wild, freezeRemaining, pendingPowerup, nextPowerupAt, toastText, toastUntil,
 let combo, maxCombo, b2b, lastActionWasRotate;
 let flashColor, flashUntil, shakeUntil, bigText, bigUntil;
 let audioCtx, muted;
+let challenge, elapsed, garbageAccum, settled, revealUntil, inMenu;
 
 function createMatrix(fill) {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(fill));
@@ -110,15 +153,21 @@ function makePiece(type) {
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
 
+// En modo desafío, salvo que el reto marque `extras: true`, se juega solo con
+// las 7 piezas clásicas: sin powerups, sin pentominós y sin tuerca.
+function extrasEnabled() {
+  return !challenge || challenge.extras;
+}
+
 function randomPiece() {
   let type;
-  if (pendingPowerup) {
+  if (extrasEnabled() && pendingPowerup) {
     pendingPowerup = false;
     type = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
-  } else if (Math.random() < PENTO_CHANCE) {
+  } else if (extrasEnabled() && Math.random() < PENTO_CHANCE) {
     type = PENTOS[Math.floor(Math.random() * PENTOS.length)];
   } else {
-    type = Math.floor(Math.random() * 8) + 1;
+    type = Math.floor(Math.random() * (extrasEnabled() ? 8 : 7)) + 1;
   }
   return makePiece(type);
 }
@@ -145,8 +194,18 @@ function rotateCW(shape) {
   return result;
 }
 
+// Inversa de rotateCW: tres giros horarios equivalen a uno antihorario.
+function rotateCCW(shape) {
+  return rotateCW(rotateCW(rotateCW(shape)));
+}
+
+// Reto "rotación inversa": a partir de `reverseFromLevel` la rotación gira al revés.
+function reversedRotation() {
+  return challenge?.reverseFromLevel && level >= challenge.reverseFromLevel;
+}
+
 function tryRotate() {
-  const rotated = rotateCW(current.shape);
+  const rotated = reversedRotation() ? rotateCCW(current.shape) : rotateCW(current.shape);
   const kicks = [0, -1, 1, -2, 2];
   for (const kick of kicks) {
     if (!collide(rotated, current.x + kick, current.y)) {
@@ -196,10 +255,13 @@ function detectTSpin() {
 }
 
 function merge() {
+  const now = performance.now();
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
-      if (current.shape[r][c])
+      if (current.shape[r][c]) {
         board[current.y + r][current.x + c] = current.shape[r][c];
+        settled[current.y + r][current.x + c] = now;
+      }
 }
 
 // Al limpiar una línea, los comodines (tinte) conectados a ella se destruyen en cascada.
@@ -236,6 +298,8 @@ function clearLines(tspin, fromPowerup) {
       board.unshift(new Array(COLS).fill(0));
       wild.splice(r, 1);
       wild.unshift(new Array(COLS).fill(false));
+      settled.splice(r, 1);
+      settled.unshift(new Array(COLS).fill(0));
       cleared++;
       r++;
     }
@@ -273,16 +337,23 @@ function clearLines(tspin, fromPowerup) {
 
   if (cleared > 0) {
     lines += cleared;
+    const prevLevel = level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
-    if (lines >= nextPowerupAt) {
+    if (extrasEnabled() && lines >= nextPowerupAt) {
       pendingPowerup = true;
       nextPowerupAt += POWERUP_EVERY;
     }
-    if (cleared === 4) {
+    if (extrasEnabled() && cleared === 4) {
       next = makePiece(SINGLE); // recompensa: la pieza en cola pasa a ser el single 1x1
       showToast('PIEZA 1×1');
     }
+    // Reto "rotación inversa": avisa justo en el instante en que se cruza el umbral.
+    if (challenge?.reverseFromLevel && prevLevel < challenge.reverseFromLevel && level >= challenge.reverseFromLevel) {
+      showToast('ROTACIÓN INVERSA', COLORS[T_TYPE]);
+    }
+    // Reto "piezas invisibles": tras limpiar, el tablero se ve un instante entero.
+    if (challenge?.invisible) revealUntil = performance.now() + REVEAL_MS;
 
     // Perfect Clear: el tablero quedó totalmente vacío tras la limpieza.
     if (board.every(row => row.every(v => !v))) {
@@ -296,6 +367,7 @@ function clearLines(tspin, fromPowerup) {
   }
 
   updateHUD();
+  checkChallenge();
 }
 
 // Decide qué toast/flash/shake/sonido mostrar tras una limpieza concreta.
@@ -475,10 +547,90 @@ function spawn() {
   next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
     // La pieza nueva no cabe: la partida termina aquí, sin seguir generando piezas.
-    endGame();
+    endGame('lose');
     return;
   }
   drawNext();
+}
+
+// Reto "tablero sucio": rellena las `n` filas inferiores con bloques fijos,
+// dejando siempre al menos un hueco por fila para que no se limpien solas.
+function prefillBoard(n) {
+  for (let r = ROWS - n; r < ROWS; r++) {
+    const gap = Math.floor(Math.random() * COLS);
+    for (let c = 0; c < COLS; c++) {
+      if (c === gap) continue;
+      if (Math.random() < 0.65) {
+        board[r][c] = Math.floor(Math.random() * 7) + 1;
+      }
+    }
+    if (board[r].every(v => !v)) board[r][Math.floor(Math.random() * COLS)] = 1; // fila no del todo vacía
+  }
+}
+
+// Reto "basura ascendente": sube una fila de basura cada `garbageEvery` ms.
+// Si no hay sitio para subirla (la fila superior ya tenía algo), es derrota.
+function riseGarbage() {
+  if (board[0].some(v => v)) {
+    endGame('lose');
+    return;
+  }
+  const gap = Math.floor(Math.random() * COLS);
+  const row = new Array(COLS).fill(GARBAGE).map((v, c) => (c === gap ? 0 : v));
+  board.shift();
+  board.push(row);
+  wild.shift();
+  wild.push(new Array(COLS).fill(false));
+  settled.shift();
+  settled.push(new Array(COLS).fill(0));
+  current.y--;
+  if (collide(current.shape, current.x, current.y)) {
+    endGame('lose');
+    return;
+  }
+  showToast('¡BASURA!', COLORS[GARBAGE]);
+  shake(200);
+}
+
+function formatTime(ms) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getRecords() {
+  try {
+    return JSON.parse(localStorage.getItem('tetris-records')) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+// Guarda un récord si mejora al existente (menos tiempo para completar, más
+// tiempo sobrevivido en "garbage"). Devuelve true si se batió el récord.
+function saveRecord(id, ms, { higherIsBetter } = {}) {
+  const records = getRecords();
+  const prev = records[id];
+  const better = prev == null || (higherIsBetter ? ms > prev : ms < prev);
+  if (better) {
+    records[id] = ms;
+    try { localStorage.setItem('tetris-records', JSON.stringify(records)); } catch (e) {}
+  }
+  return better;
+}
+
+// Revisa si el desafío actual se ganó o se perdió por tiempo; se llama tras
+// cada limpieza de línea y en cada frame del bucle principal.
+function checkChallenge() {
+  if (!challenge || gameOver) return;
+  if (challenge.goalLines && lines >= challenge.goalLines) {
+    endGame('win');
+  } else if (challenge.surviveMs && elapsed >= challenge.surviveMs) {
+    endGame('win');
+  } else if (challenge.timeLimit && elapsed >= challenge.timeLimit) {
+    endGame('timeout');
+  }
 }
 
 function updateHUD() {
@@ -495,6 +647,34 @@ function updateHUD() {
   } else {
     comboEl.classList.add('hidden');
   }
+  updateGoalHUD();
+}
+
+// Refresca el texto de la sección OBJETIVO según el reto activo.
+function updateGoalHUD() {
+  if (!challenge) return;
+  if (challenge.goalLines) {
+    goalText.textContent = `${Math.min(lines, challenge.goalLines)} / ${challenge.goalLines} líneas`;
+  } else if (challenge.surviveMs) {
+    goalText.textContent = 'Sobrevive';
+  }
+  if (challenge.timeLimit) {
+    goalTimer.textContent = formatTime(challenge.timeLimit - elapsed);
+  } else if (challenge.surviveMs) {
+    goalTimer.textContent = formatTime(challenge.surviveMs - elapsed);
+  } else {
+    goalTimer.textContent = formatTime(elapsed);
+  }
+}
+
+// Reto "piezas invisibles": opacidad de un bloque fijo según cuánto hace que se asentó.
+// `ts` en 0 significa "sin seguimiento" (p.ej. basura) y se dibuja siempre visible.
+function fadeAlpha(ts, now) {
+  if (!ts) return 1;
+  const age = now - ts;
+  if (age <= FADE_DELAY) return 1;
+  if (age >= FADE_MS) return 0;
+  return 1 - (age - FADE_DELAY) / (FADE_MS - FADE_DELAY);
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -624,9 +804,10 @@ function draw() {
   drawGrid();
 
   // board
+  const fading = challenge?.invisible && !(revealUntil > now);
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
-      drawBlock(ctx, c, r, board[r][c], BLOCK);
+      drawBlock(ctx, c, r, board[r][c], BLOCK, fading ? fadeAlpha(settled[r][c], now) : 1);
 
   // agujero de las tuercas ya fijas en el tablero: celda vacía rodeada por un anillo completo
   for (let r = 0; r < ROWS; r++)
@@ -727,16 +908,37 @@ function drawNext() {
   if (isPowerup(next.type)) drawPowerIcon(nextCtx, offX, offY, next.type, NB);
 }
 
-function endGame() {
+// outcome: 'lose' (tope del tablero / basura sin sitio) | 'win' (objetivo cumplido)
+// | 'timeout' (se acabó el tiempo sin cumplir el objetivo).
+function endGame(outcome = 'lose') {
   if (gameOver) return;
   gameOver = true;
   cancelAnimationFrame(animId);
   animId = null;
-  overlayTitle.textContent = 'GAME OVER';
+  overlayTitle.textContent = outcome === 'win' ? '¡DESAFÍO SUPERADO!'
+    : outcome === 'timeout' ? 'TIEMPO AGOTADO'
+    : 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlayCombo.textContent = `Combo máx.: x${maxCombo}`;
+  overlayRecord.textContent = '';
+
+  // Récords por desafío: los retos de líneas guardan el mejor tiempo solo al
+  // ganar; "basura ascendente" guarda el mayor tiempo sobrevivido siempre.
+  if (challenge) {
+    let beaten = false;
+    if (challenge.goalLines && outcome === 'win') {
+      beaten = saveRecord(challenge.id, elapsed);
+    } else if (challenge.surviveMs) {
+      beaten = saveRecord(challenge.id, elapsed, { higherIsBetter: true });
+    }
+    const best = getRecords()[challenge.id];
+    if (best != null) {
+      overlayRecord.textContent = beaten ? `¡Nuevo récord! ${formatTime(best)}` : `Récord: ${formatTime(best)}`;
+    }
+  }
+
   overlay.classList.remove('hidden');
-  playGameOver();
+  if (outcome === 'win') playWin(); else playGameOver();
 }
 
 function togglePause() {
@@ -750,6 +952,7 @@ function togglePause() {
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
     overlayCombo.textContent = '';
+    overlayRecord.textContent = '';
     overlay.classList.remove('hidden');
   }
 }
@@ -759,29 +962,49 @@ function loop(ts) {
   if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
-  if (freezeRemaining > 0) {
-    freezeRemaining = Math.max(0, freezeRemaining - dt);
-    dropAccum = 0;
-  } else {
-    dropAccum += dt;
-    if (dropAccum >= dropInterval) {
+
+  if (challenge) {
+    elapsed += dt;
+    if (challenge.garbageEvery) {
+      garbageAccum += dt;
+      if (garbageAccum >= challenge.garbageEvery) {
+        garbageAccum = 0;
+        riseGarbage();
+      }
+    }
+    if (!gameOver) checkChallenge();
+    updateGoalHUD();
+  }
+
+  if (!gameOver) {
+    if (freezeRemaining > 0) {
+      freezeRemaining = Math.max(0, freezeRemaining - dt);
       dropAccum = 0;
-      if (!collide(current.shape, current.x, current.y + 1)) {
-        current.y++;
-        markAction('drop');
-      } else {
-        lockPiece();
+    } else {
+      dropAccum += dt;
+      if (dropAccum >= dropInterval) {
+        dropAccum = 0;
+        if (!collide(current.shape, current.x, current.y + 1)) {
+          current.y++;
+          markAction('drop');
+        } else {
+          lockPiece();
+        }
       }
     }
   }
+
   draw();
-  if (gameOver) return; // lockPiece() pudo terminar la partida: no programar otro frame.
+  if (gameOver) return; // lockPiece()/riseGarbage()/checkChallenge() pudieron terminar la partida.
   animId = requestAnimationFrame(loop);
 }
 
-function init() {
+// ch: entrada de CHALLENGES para jugar un desafío, o null/undefined para el modo clásico.
+function init(ch) {
+  challenge = ch || null;
   board = createBoard();
   wild = createMatrix(false);
+  settled = createMatrix(0);
   score = 0;
   lines = 0;
   level = 1;
@@ -803,13 +1026,56 @@ function init() {
   shakeUntil = 0;
   bigText = '';
   bigUntil = 0;
+  elapsed = 0;
+  garbageAccum = 0;
+  revealUntil = 0;
   lastTime = performance.now();
+
+  if (challenge?.prefillRows) prefillBoard(challenge.prefillRows);
+  goalSection.classList.toggle('hidden', !challenge);
+
   next = randomPiece();
   spawn();
   updateHUD();
+  inMenu = false;
+  menuOverlay.classList.add('hidden');
   overlay.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
+}
+
+// Pinta las tarjetas del menú (clásico + cada desafío) con su récord actual.
+function renderMenu() {
+  const records = getRecords();
+  const modes = [
+    { name: 'CLÁSICO', desc: 'Modo libre: powerups, pentominós, tuerca y combos', challenge: null },
+    ...CHALLENGES.map(ch => ({ name: ch.name, desc: ch.desc, challenge: ch })),
+  ];
+  menuList.innerHTML = '';
+  modes.forEach(({ name, desc, challenge: ch }, i) => {
+    const record = ch ? records[ch.id] : null;
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'menu-card';
+    card.innerHTML = `
+      <span class="menu-card-name">${i + 1}. ${name}</span>
+      <span class="menu-card-desc">${desc}</span>
+      ${record != null ? `<span class="menu-card-record">Récord: ${formatTime(record)}</span>` : ''}
+    `;
+    card.addEventListener('click', () => init(ch));
+    menuList.appendChild(card);
+  });
+}
+
+function showMenu() {
+  cancelAnimationFrame(animId);
+  animId = null;
+  gameOver = true; // evita que un frame de loop en vuelo siga operando sobre la partida anterior
+  paused = false;
+  inMenu = true;
+  overlay.classList.add('hidden');
+  renderMenu();
+  menuOverlay.classList.remove('hidden');
 }
 
 // --- Efectos de sonido sintetizados con Web Audio API (sin assets externos) ---
@@ -871,6 +1137,11 @@ function playGameOver() {
   playSeq([392, 330, 261, 196], 0.16, { type: 'sawtooth', gain: 0.07 });
 }
 
+// Victoria en un desafío: secuencia ascendente, lo opuesto a playGameOver().
+function playWin() {
+  playSeq([392, 523, 659, 784], 0.12, { type: 'square', gain: 0.08 });
+}
+
 // Mute: se recuerda entre sesiones, igual que el tema visual.
 function toggleMute() {
   setMuted(!muted);
@@ -894,6 +1165,12 @@ setMuted(savedMuted);
 
 document.addEventListener('keydown', e => {
   ensureAudio(); // primer gesto del usuario: habilita el audio (política de autoplay)
+  if (inMenu) {
+    const digit = e.code.match(/^Digit([1-9])$/);
+    if (digit) menuList.children[Number(digit[1]) - 1]?.click();
+    return;
+  }
+  if (e.code === 'Escape') { showMenu(); return; }
   if (e.code === 'KeyP') { togglePause(); return; }
   if (e.code === 'KeyM') { toggleMute(); return; }
   if (paused || gameOver) return;
@@ -919,7 +1196,8 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+restartBtn.addEventListener('click', () => init(challenge));
+menuBtn.addEventListener('click', showMenu);
 
 // Tema: oscuro por defecto, el usuario puede cambiar a claro (se recuerda en localStorage)
 function applyTheme(theme) {
@@ -938,4 +1216,4 @@ let savedTheme = 'dark';
 try { savedTheme = localStorage.getItem('tetris-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
 
 applyTheme(savedTheme);
-init();
+showMenu();
