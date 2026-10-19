@@ -28,12 +28,18 @@
         </div>
 
         <div class="panel-section">
+          <span class="label">COMBO</span>
+          <span class="value combo hidden" id="combo">x2</span>
+        </div>
+
+        <div class="panel-section">
           <span class="label">NEXT</span>
           <canvas id="next-canvas" width="120" height="120"></canvas>
         </div>
 
         <div class="panel-section">
           <button id="theme-toggle" type="button" aria-label="Cambiar tema">☀ Modo claro</button>
+          <button id="sound-toggle" type="button" aria-label="Silenciar sonido">🔊 Sonido</button>
         </div>
 
         <div class="panel-section powerups">
@@ -44,6 +50,16 @@
             <li><span class="pw-dot pw-dye"></span> Tinte: comodines</li>
             <li><span class="pw-dot pw-gravity"></span> Gravedad: compacta</li>
             <li><span class="pw-dot pw-freeze"></span> Congelar: pausa 5s</li>
+          </ul>
+        </div>
+
+        <div class="panel-section bonuses">
+          <span class="label">BONOS DE COMBO</span>
+          <ul>
+            <li>Combo: líneas seguidas multiplican x2, x3, x4…</li>
+            <li>T-spin: rotar la T en un hueco ajustado</li>
+            <li>B2B: dos Tetris o T-spins consecutivos (×1.5)</li>
+            <li>Perfect Clear: vaciar el tablero por completo</li>
           </ul>
         </div>
 
@@ -66,6 +82,7 @@
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
             <li><kbd>P</kbd> pausa</li>
+            <li><kbd>M</kbd> sonido</li>
           </ul>
         </div>
       </aside>
@@ -75,6 +92,7 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <p id="overlay-combo"></p>
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>

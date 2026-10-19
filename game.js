@@ -67,6 +67,14 @@ function isPowerup(type) {
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+// --- Combo, T-spin, B2B y Perfect Clear (ver CLAUDE.md) ---
+const TSPIN_SCORES = [400, 800, 1200, 1600];  // 0,1,2,3+ líneas con T-spin completo
+const TSPIN_MINI = [100, 200, 400, 600];      // variante mini
+const PERFECT_SCORES = [0, 800, 1200, 1800, 2000];
+const COMBO_BONUS = 50; // puntos planos por eslabón de combo, multiplicados por nivel
+const B2B_MULT = 1.5;
+const T_TYPE = 3; // índice de la pieza T en PIECES
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -74,14 +82,20 @@ const nextCtx = nextCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
+const comboEl = document.getElementById('combo');
 const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
+const overlayCombo = document.getElementById('overlay-combo');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const soundToggle = document.getElementById('sound-toggle');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
-let wild, freezeRemaining, pendingPowerup, nextPowerupAt, toastText, toastUntil;
+let wild, freezeRemaining, pendingPowerup, nextPowerupAt, toastText, toastUntil, toastColor;
+let combo, maxCombo, b2b, lastActionWasRotate;
+let flashColor, flashUntil, shakeUntil, bigText, bigUntil;
+let audioCtx, muted;
 
 function createMatrix(fill) {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(fill));
@@ -138,9 +152,47 @@ function tryRotate() {
     if (!collide(rotated, current.x + kick, current.y)) {
       current.shape = rotated;
       current.x += kick;
+      markAction('rotate');
       return;
     }
   }
+}
+
+// Recuerda si el último movimiento válido de la pieza actual fue un giro,
+// clave para distinguir un T-spin de un encaje normal (regla de las 3 esquinas).
+function markAction(kind) {
+  lastActionWasRotate = kind === 'rotate';
+}
+
+// Detecta T-spin con la regla de las 3 esquinas: solo aplica a la pieza T,
+// solo si llegó a su posición final rotando, y necesita 3 de sus 4 diagonales
+// ocupadas (fuera del tablero cuenta como ocupado). La esquina "mini" vs "full"
+// depende de si las dos diagonales frontales (las contrarias a la punta) están llenas.
+function detectTSpin() {
+  if (current.type !== T_TYPE || !lastActionWasRotate) return 'none';
+  const cx = current.x + 1;
+  const cy = current.y + 1;
+  const occupied = (x, y) => x < 0 || x >= COLS || y < 0 || y >= ROWS || (y >= 0 && !!board[y][x]);
+  const corners = {
+    tl: occupied(cx - 1, cy - 1),
+    tr: occupied(cx + 1, cy - 1),
+    bl: occupied(cx - 1, cy + 1),
+    br: occupied(cx + 1, cy + 1),
+  };
+  const filled = Object.values(corners).filter(Boolean).length;
+  if (filled < 3) return 'none';
+
+  // Las esquinas "frontales" son las adyacentes al lado donde apunta la punta de la T;
+  // si ambas están ocupadas es T-spin completo, si no, es mini.
+  const shape = current.shape;
+  let frontCorners;
+  if (shape[0][1]) frontCorners = ['tl', 'tr'];       // punta hacia arriba
+  else if (shape[2][1]) frontCorners = ['bl', 'br'];  // punta hacia abajo
+  else if (shape[1][0]) frontCorners = ['tl', 'bl'];  // punta hacia la izquierda
+  else frontCorners = ['tr', 'br'];                   // punta hacia la derecha
+
+  const frontFilled = frontCorners.every(k => corners[k]);
+  return frontFilled ? 'full' : 'mini';
 }
 
 function merge() {
@@ -172,7 +224,10 @@ function popWildCascade(r) {
   }
 }
 
-function clearLines() {
+// tspin: 'none' | 'mini' | 'full' detectado antes de encajar la pieza.
+// fromPowerup: true si lo que acaba de encajar fue una pieza-powerup (no cuenta
+// para el combo ni para B2B, sea cual sea el resultado).
+function clearLines(tspin, fromPowerup) {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(v => v !== 0)) {
@@ -185,9 +240,39 @@ function clearLines() {
       r++;
     }
   }
-  if (cleared) {
+
+  // Combo: cada línea limpiada en turnos consecutivos sube el multiplicador;
+  // un bloqueo sin líneas lo rompe, salvo que venga de un powerup (neutral).
+  if (cleared > 0) {
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+  } else if (!fromPowerup) {
+    combo = 0;
+  }
+  const comboMult = Math.max(1, combo);
+  let b2bChainApplied = false; // esta limpieza fue difícil Y continuaba una racha B2B
+
+  if (cleared > 0 || tspin !== 'none') {
+    const idx = Math.min(cleared, 3);
+    let base = tspin === 'full' ? TSPIN_SCORES[idx]
+      : tspin === 'mini' ? TSPIN_MINI[idx]
+      : (LINE_SCORES[cleared] || 0);
+
+    const difficult = cleared === 4 || tspin !== 'none';
+    b2bChainApplied = difficult && b2b;
+    if (b2bChainApplied) base *= B2B_MULT;
+
+    score += Math.round(base * level * comboMult) + COMBO_BONUS * (combo - 1) * level;
+
+    if (!fromPowerup) {
+      b2b = difficult ? true : (cleared > 0 ? false : b2b);
+    }
+
+    triggerClearEffects(cleared, tspin, b2bChainApplied, comboMult);
+  }
+
+  if (cleared > 0) {
     lines += cleared;
-    score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     if (lines >= nextPowerupAt) {
@@ -196,9 +281,43 @@ function clearLines() {
     }
     if (cleared === 4) {
       next = makePiece(SINGLE); // recompensa: la pieza en cola pasa a ser el single 1x1
-      showToast('¡TETRIS! PIEZA 1×1');
+      showToast('PIEZA 1×1');
     }
-    updateHUD();
+
+    // Perfect Clear: el tablero quedó totalmente vacío tras la limpieza.
+    if (board.every(row => row.every(v => !v))) {
+      const bonus = PERFECT_SCORES[cleared] * level * (b2bChainApplied ? 2 : 1);
+      score += bonus;
+      showBig('¡PERFECT CLEAR!');
+      flash('#ffffff', 500);
+      shake(400);
+      playPerfectClear();
+    }
+  }
+
+  updateHUD();
+}
+
+// Decide qué toast/flash/shake/sonido mostrar tras una limpieza concreta.
+function triggerClearEffects(cleared, tspin, isB2BChain, comboMult) {
+  if (tspin !== 'none') {
+    const label = tspin === 'full' ? 'T-SPIN' : 'T-SPIN MINI';
+    showBig(isB2BChain ? `B2B ${label}` : label);
+    flash(COLORS[T_TYPE], 350);
+    if (cleared >= 2) shake(300);
+    playTSpin();
+  } else if (cleared === 4) {
+    showBig(isB2BChain ? 'B2B TETRIS' : '¡TETRIS!');
+    flash(COLORS[1], 400);
+    shake(350);
+    playTetris();
+  } else if (cleared > 0) {
+    playClear(cleared);
+  }
+
+  if (comboMult >= 2) {
+    showToast(`COMBO x${comboMult}`, COLORS[3]);
+    playCombo(comboMult);
   }
 }
 
@@ -210,6 +329,7 @@ function ghostY() {
 
 function hardDrop() {
   const gy = ghostY();
+  if (gy > current.y) markAction('drop');
   score += (gy - current.y) * 2;
   current.y = gy;
   lockPiece();
@@ -218,6 +338,7 @@ function hardDrop() {
 function softDrop() {
   if (!collide(current.shape, current.x, current.y + 1)) {
     current.y++;
+    markAction('drop');
     score += 1;
     updateHUD();
   } else {
@@ -226,18 +347,38 @@ function softDrop() {
 }
 
 function lockPiece() {
-  if (isPowerup(current.type)) {
+  const tspin = detectTSpin();
+  const fromPowerup = isPowerup(current.type);
+  if (fromPowerup) {
     applyPowerup(current.type, current.x, current.y);
   } else {
     merge();
   }
-  clearLines();
+  clearLines(tspin, fromPowerup);
   spawn();
 }
 
-function showToast(text) {
+function showToast(text, color) {
   toastText = text;
+  toastColor = color || 'rgba(255,255,255,0.9)';
   toastUntil = performance.now() + TOAST_MS;
+}
+
+// Texto grande centrado para los eventos importantes: Tetris, T-spin, B2B, Perfect Clear.
+function showBig(text) {
+  bigText = text;
+  bigUntil = performance.now() + TOAST_MS;
+}
+
+// Destello de color a pantalla completa, se desvanece en `ms` milisegundos.
+function flash(color, ms) {
+  flashColor = color;
+  flashUntil = performance.now() + ms;
+}
+
+// Vibración breve del tablero completo.
+function shake(ms) {
+  shakeUntil = performance.now() + ms;
 }
 
 function applyPowerup(type, x, y) {
@@ -330,6 +471,7 @@ function freeze() {
 
 function spawn() {
   current = next;
+  lastActionWasRotate = false; // la pieza nueva aún no se movió ni rotó
   next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
     // La pieza nueva no cabe: la partida termina aquí, sin seguir generando piezas.
@@ -343,6 +485,16 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  if (combo >= 2) {
+    comboEl.textContent = `x${combo}`;
+    comboEl.classList.remove('hidden');
+    // reinicia la animación de pulso en cada eslabón del combo
+    comboEl.classList.remove('pulse');
+    void comboEl.offsetWidth; // fuerza reflow para poder repetir la animación
+    comboEl.classList.add('pulse');
+  } else {
+    comboEl.classList.add('hidden');
+  }
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -460,6 +612,15 @@ function drawGrid() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const now = performance.now();
+  const shaking = shakeUntil > now;
+  ctx.save();
+  if (shaking) {
+    const amount = 4 * (shakeUntil - now) / 350; // se amortigua hacia el final
+    ctx.translate((Math.random() - 0.5) * amount, (Math.random() - 0.5) * amount);
+  }
+
   drawGrid();
 
   // board
@@ -502,10 +663,10 @@ function draw() {
   if (isPowerup(current.type)) drawPowerIcon(ctx, current.x, current.y, current.type, BLOCK);
 
   // aviso de efecto activado
-  if (toastUntil && performance.now() < toastUntil) {
+  if (toastUntil && now < toastUntil) {
     ctx.font = 'bold 16px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = toastColor || 'rgba(255,255,255,0.9)';
     ctx.fillText(toastText, canvas.width / 2, 24);
   }
 
@@ -516,7 +677,28 @@ function draw() {
     ctx.fillStyle = COLORS[FREEZE];
     ctx.fillText(`❄ ${(freezeRemaining / 1000).toFixed(1)}s`, canvas.width / 2, canvas.height - 10);
   }
+
+  // texto grande para combos/eventos destacados (Tetris, T-spin, B2B, Perfect Clear)
+  if (bigUntil > now) {
+    const remaining = bigUntil - now;
+    ctx.globalAlpha = Math.min(1, remaining / 300);
+    ctx.font = 'bold 22px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillText(bigText, canvas.width / 2, canvas.height / 2);
+    ctx.globalAlpha = 1;
+  }
   ctx.textAlign = 'start';
+  ctx.restore();
+
+  // destello de color a pantalla completa
+  if (flashUntil > now && flashColor) {
+    const alpha = 0.35 * (flashUntil - now) / 500;
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillStyle = flashColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+  }
 }
 
 // Comprueba si una celda vacía del tablero está rodeada por los 8 vecinos de una tuerca,
@@ -552,7 +734,9 @@ function endGame() {
   animId = null;
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  overlayCombo.textContent = `Combo máx.: x${maxCombo}`;
   overlay.classList.remove('hidden');
+  playGameOver();
 }
 
 function togglePause() {
@@ -565,6 +749,7 @@ function togglePause() {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    overlayCombo.textContent = '';
     overlay.classList.remove('hidden');
   }
 }
@@ -583,6 +768,7 @@ function loop(ts) {
       dropAccum = 0;
       if (!collide(current.shape, current.x, current.y + 1)) {
         current.y++;
+        markAction('drop');
       } else {
         lockPiece();
       }
@@ -608,6 +794,15 @@ function init() {
   nextPowerupAt = POWERUP_EVERY;
   toastText = '';
   toastUntil = 0;
+  combo = 0;
+  maxCombo = 0;
+  b2b = false;
+  lastActionWasRotate = false;
+  flashColor = null;
+  flashUntil = 0;
+  shakeUntil = 0;
+  bigText = '';
+  bigUntil = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
@@ -617,15 +812,97 @@ function init() {
   animId = requestAnimationFrame(loop);
 }
 
+// --- Efectos de sonido sintetizados con Web Audio API (sin assets externos) ---
+
+// Crea el AudioContext de forma perezosa (solo tras un gesto del usuario, como
+// exige la política de autoplay de los navegadores) y lo reanuda si estaba suspendido.
+function ensureAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { /* navegador sin soporte de Web Audio: el juego sigue funcionando sin sonido */ }
+}
+
+// Un tono simple con envolvente de ataque corto y caída exponencial.
+function playTone(freq, dur, { type = 'square', gain = 0.06, delay = 0 } = {}) {
+  if (muted || !audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const amp = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    const t0 = audioCtx.currentTime + delay;
+    amp.gain.setValueAtTime(0, t0);
+    amp.gain.linearRampToValueAtTime(gain, t0 + 0.015);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(amp).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  } catch (e) { /* ignorar fallos puntuales de audio */ }
+}
+
+// Secuencia de tonos encadenados por un paso de tiempo fijo.
+function playSeq(freqs, step, opts) {
+  freqs.forEach((f, i) => playTone(f, step * 1.1, { ...opts, delay: (opts?.delay || 0) + i * step }));
+}
+
+function playClear(cleared) {
+  playTone(520 + cleared * 40, 0.12, { type: 'triangle', gain: 0.05 });
+}
+
+function playCombo(comboMult) {
+  const freq = 440 * Math.pow(2, Math.min(comboMult, 12) / 12);
+  playTone(freq, 0.14, { type: 'triangle', gain: 0.06 });
+}
+
+function playTSpin() {
+  playSeq([660, 500, 740], 0.08, { type: 'sawtooth', gain: 0.07 });
+}
+
+function playTetris() {
+  playSeq([523, 659, 784, 1047], 0.09, { type: 'square', gain: 0.07 });
+}
+
+function playPerfectClear() {
+  playSeq([523, 659, 784, 1047, 1318], 0.11, { type: 'square', gain: 0.08 });
+}
+
+function playGameOver() {
+  playSeq([392, 330, 261, 196], 0.16, { type: 'sawtooth', gain: 0.07 });
+}
+
+// Mute: se recuerda entre sesiones, igual que el tema visual.
+function toggleMute() {
+  setMuted(!muted);
+}
+
+function setMuted(value) {
+  muted = value;
+  soundToggle.textContent = muted ? '🔇 Sonido' : '🔊 Sonido';
+  try { localStorage.setItem('tetris-muted', muted ? '1' : '0'); } catch (e) {}
+}
+
+soundToggle.addEventListener('click', () => {
+  ensureAudio();
+  toggleMute();
+  soundToggle.blur(); // evita que Space (caída) active el botón
+});
+
+let savedMuted = false;
+try { savedMuted = localStorage.getItem('tetris-muted') === '1'; } catch (e) {}
+setMuted(savedMuted);
+
 document.addEventListener('keydown', e => {
+  ensureAudio(); // primer gesto del usuario: habilita el audio (política de autoplay)
   if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyM') { toggleMute(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
-      if (!collide(current.shape, current.x - 1, current.y)) current.x--;
+      if (!collide(current.shape, current.x - 1, current.y)) { current.x--; markAction('move'); }
       break;
     case 'ArrowRight':
-      if (!collide(current.shape, current.x + 1, current.y)) current.x++;
+      if (!collide(current.shape, current.x + 1, current.y)) { current.x++; markAction('move'); }
       break;
     case 'ArrowDown':
       softDrop();

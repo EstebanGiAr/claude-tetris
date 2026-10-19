@@ -43,6 +43,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
+- **Modo combo y multiplicadores**: limpiar líneas en turnos consecutivos encadena un combo (x2, x3, x4…) que multiplica la puntuación; además hay bonus por **T-spin**, por **Back-to-Back** (dos Tetris o T-spins consecutivos) y por **Perfect Clear** (dejar el tablero totalmente vacío). Cada encadenado dispara un flash de color, una vibración de pantalla y un sonido generado con Web Audio (silenciable con `M`).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
 
@@ -88,6 +89,7 @@ Después abre `http://localhost:8000` en el navegador.
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
+| `M`       | Silenciar / activar sonido        |
 
 ---
 
@@ -119,6 +121,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
+- **Combo y bonus** (`clearLines`): cada línea limpiada en bloqueos consecutivos incrementa `combo`, que multiplica la puntuación de esa limpieza (x1, x2, x3…); un bloqueo sin líneas lo rompe (salvo que venga de un powerup, que es neutral). `detectTSpin` aplica la regla de las 3 esquinas para detectar T-spins (completo o mini), que sustituyen la puntuación base por `TSPIN_SCORES`/`TSPIN_MINI`. Dos Tetris o T-spins consecutivos activan el bonus Back-to-Back (`b2b`, ×1.5). Si tras limpiar el tablero queda totalmente vacío, se suma el bonus de Perfect Clear (`PERFECT_SCORES`). Cada evento dispara un `flash`, un `shake` y un sonido sintetizado con Web Audio.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 
@@ -179,6 +182,10 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `BLOCK`        | Tamaño en píxeles de cada celda          | `30`                  |
 | `COLORS`       | Paleta de colores por tipo de pieza      | 7 colores             |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
+| `TSPIN_SCORES` / `TSPIN_MINI` | Puntos por T-spin completo / mini | `[400,800,1200,1600]` / `[100,200,400,600]` |
+| `PERFECT_SCORES` | Bonus por Perfect Clear según líneas limpiadas | `[0,800,1200,1800,2000]` |
+| `COMBO_BONUS`  | Puntos planos por cada eslabón de combo  | `50`                   |
+| `B2B_MULT`     | Multiplicador de la racha Back-to-Back   | `1.5`                  |
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
