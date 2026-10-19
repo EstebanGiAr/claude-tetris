@@ -173,6 +173,36 @@ kbd {
   color: var(--kbd-text);
 }
 
+/* ---- Leyenda de powerups ---- */
+.powerups ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.powerups li {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pw-dot {
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.pw-bomb    { background: #ef5350; }
+.pw-bolt    { background: #fff176; }
+.pw-dye     { background: #f06292; }
+.pw-gravity { background: #4db6ac; }
+.pw-freeze  { background: #80d8ff; }
+
 /* ---- Overlay ---- */
 .overlay {
   position: absolute;

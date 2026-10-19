@@ -14,9 +14,22 @@ const COLORS = [
   '#90caf9', // J - azul pálido
   '#ffb74d', // L - orange
   '#b0bec5', // tuerca - gris metálico
+  '#ef5350', // bomba - rojo
+  '#fff176', // rayo - amarillo eléctrico
+  '#f06292', // tinte - rosa
+  '#4db6ac', // gravedad - verde azulado
+  '#80d8ff', // congelar - celeste hielo
 ];
 
 const NUT = 8; // tipo de pieza "tuerca" (reto): anillo con agujero central
+
+// Powerups: piezas especiales de 1x1 cuyo efecto se dispara al encajar.
+const BOMB = 9, BOLT = 10, DYE = 11, GRAVITY = 12, FREEZE = 13;
+const POWERUPS = [BOMB, BOLT, DYE, GRAVITY, FREEZE];
+const POWERUP_NAMES = { 9: 'BOMBA', 10: 'RAYO', 11: 'TINTE', 12: 'GRAVEDAD', 13: 'CONGELAR' };
+const POWERUP_EVERY = 5; // líneas entre apariciones de powerups
+const FREEZE_MS = 5000;
+const TOAST_MS = 1800;
 
 const PIECES = [
   null,
@@ -28,7 +41,16 @@ const PIECES = [
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
   [[8,8,8],[8,0,8],[8,8,8]],                  // Tuerca (reto): anillo con agujero central
+  [[9]],   // Bomba: destruye un área 3x3
+  [[10]],  // Rayo: limpia fila y columna del impacto
+  [[11]],  // Tinte: convierte el color más abundante en comodines
+  [[12]],  // Gravedad: compacta los huecos del tablero
+  [[13]],  // Congelar: pausa la caída 5s
 ];
+
+function isPowerup(type) {
+  return type >= BOMB;
+}
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -46,13 +68,24 @@ const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let wild, freezeRemaining, pendingPowerup, nextPowerupAt, toastText, toastUntil;
+
+function createMatrix(fill) {
+  return Array.from({ length: ROWS }, () => new Array(COLS).fill(fill));
+}
 
 function createBoard() {
-  return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+  return createMatrix(0);
 }
 
 function randomPiece() {
-  const type = Math.floor(Math.random() * 8) + 1;
+  let type;
+  if (pendingPowerup) {
+    pendingPowerup = false;
+    type = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
+  } else {
+    type = Math.floor(Math.random() * 8) + 1;
+  }
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
@@ -98,12 +131,37 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
+// Al limpiar una línea, los comodines (tinte) conectados a ella se destruyen en cascada.
+function popWildCascade(r) {
+  const queue = [];
+  for (let c = 0; c < COLS; c++) {
+    if (r - 1 >= 0 && wild[r - 1][c]) queue.push([r - 1, c]);
+    if (r + 1 < ROWS && wild[r + 1][c]) queue.push([r + 1, c]);
+  }
+  const visited = new Set();
+  while (queue.length) {
+    const [cr, cc] = queue.pop();
+    const key = `${cr},${cc}`;
+    if (visited.has(key) || !wild[cr][cc]) continue;
+    visited.add(key);
+    board[cr][cc] = 0;
+    wild[cr][cc] = false;
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nr = cr + dr, nc = cc + dc;
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && wild[nr][nc]) queue.push([nr, nc]);
+    }
+  }
+}
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(v => v !== 0)) {
+      popWildCascade(r);
       board.splice(r, 1);
       board.unshift(new Array(COLS).fill(0));
+      wild.splice(r, 1);
+      wild.unshift(new Array(COLS).fill(false));
       cleared++;
       r++;
     }
@@ -113,6 +171,10 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    if (lines >= nextPowerupAt) {
+      pendingPowerup = true;
+      nextPowerupAt += POWERUP_EVERY;
+    }
     updateHUD();
   }
 }
@@ -141,9 +203,106 @@ function softDrop() {
 }
 
 function lockPiece() {
-  merge();
+  if (isPowerup(current.type)) {
+    applyPowerup(current.type, current.x, current.y);
+  } else {
+    merge();
+  }
   clearLines();
   spawn();
+}
+
+function showToast(text) {
+  toastText = text;
+  toastUntil = performance.now() + TOAST_MS;
+}
+
+function applyPowerup(type, x, y) {
+  switch (type) {
+    case BOMB: blast(x, y); break;
+    case BOLT: bolt(x, y); break;
+    case DYE: dye(); break;
+    case GRAVITY: compact(); break;
+    case FREEZE: freeze(); break;
+  }
+  showToast(POWERUP_NAMES[type]);
+}
+
+// Bomba: vacía el área 3x3 centrada en el punto de impacto.
+function blast(x, y) {
+  let destroyed = 0;
+  for (let r = y - 1; r <= y + 1; r++) {
+    for (let c = x - 1; c <= x + 1; c++) {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+      if (board[r][c]) destroyed++;
+      board[r][c] = 0;
+      wild[r][c] = false;
+    }
+  }
+  score += 10 * destroyed * level;
+}
+
+// Rayo: vacía la fila y la columna completas del punto de impacto.
+function bolt(x, y) {
+  let destroyed = 0;
+  for (let c = 0; c < COLS; c++) {
+    if (board[y][c]) destroyed++;
+    board[y][c] = 0;
+    wild[y][c] = false;
+  }
+  for (let r = 0; r < ROWS; r++) {
+    if (board[r][x]) destroyed++;
+    board[r][x] = 0;
+    wild[r][x] = false;
+  }
+  score += 10 * destroyed * level;
+}
+
+// Tinte: el color más abundante del tablero se convierte en comodines frágiles.
+function dye() {
+  const counts = new Array(9).fill(0);
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (board[r][c] && board[r][c] !== NUT) counts[board[r][c]]++;
+  let bestColor = 0;
+  for (let i = 1; i < counts.length; i++)
+    if (counts[i] > counts[bestColor]) bestColor = i;
+  if (!bestColor) return;
+  let marked = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (board[r][c] === bestColor) { wild[r][c] = true; marked++; }
+  score += 10 * marked * level;
+}
+
+// Gravedad: compacta cada columna hacia abajo, eliminando huecos intermedios.
+function compact() {
+  for (let c = 0; c < COLS; c++) {
+    const colorStack = [];
+    const wildStack = [];
+    for (let r = 0; r < ROWS; r++) {
+      if (board[r][c]) {
+        colorStack.push(board[r][c]);
+        wildStack.push(wild[r][c]);
+      }
+    }
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (colorStack.length) {
+        board[r][c] = colorStack.pop();
+        wild[r][c] = wildStack.pop();
+      } else {
+        board[r][c] = 0;
+        wild[r][c] = false;
+      }
+    }
+  }
+  score += 50 * level;
+}
+
+// Congelar: detiene la caída automática durante FREEZE_MS.
+function freeze() {
+  freezeRemaining = FREEZE_MS;
+  score += 100 * level;
 }
 
 function spawn() {
@@ -191,6 +350,74 @@ function drawNutHole(context, x, y, size, alpha) {
   context.globalAlpha = 1;
 }
 
+// Dibuja el icono de una pieza-powerup sobre su celda.
+function drawPowerIcon(context, x, y, type, size, alpha) {
+  const cx = (x + 0.5) * size;
+  const cy = (y + 0.5) * size;
+  context.globalAlpha = alpha ?? 1;
+  context.strokeStyle = 'rgba(0,0,0,0.65)';
+  context.fillStyle = 'rgba(0,0,0,0.65)';
+  context.lineWidth = 2;
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+
+  switch (type) {
+    case BOMB: {
+      context.beginPath();
+      context.arc(cx, cy + size * 0.06, size * 0.26, 0, Math.PI * 2);
+      context.fill();
+      context.beginPath();
+      context.moveTo(cx + size * 0.12, cy - size * 0.22);
+      context.lineTo(cx + size * 0.28, cy - size * 0.38);
+      context.stroke();
+      break;
+    }
+    case BOLT: {
+      context.beginPath();
+      context.moveTo(cx + size * 0.05, cy - size * 0.32);
+      context.lineTo(cx - size * 0.15, cy + size * 0.05);
+      context.lineTo(cx + size * 0.05, cy + size * 0.05);
+      context.lineTo(cx - size * 0.1, cy + size * 0.32);
+      context.lineTo(cx + size * 0.25, cy - size * 0.1);
+      context.lineTo(cx + size * 0.02, cy - size * 0.1);
+      context.closePath();
+      context.fill();
+      break;
+    }
+    case DYE: {
+      context.beginPath();
+      context.moveTo(cx, cy - size * 0.32);
+      context.quadraticCurveTo(cx + size * 0.26, cy + size * 0.1, cx, cy + size * 0.32);
+      context.quadraticCurveTo(cx - size * 0.26, cy + size * 0.1, cx, cy - size * 0.32);
+      context.fill();
+      break;
+    }
+    case GRAVITY: {
+      for (const dx of [-size * 0.18, 0, size * 0.18]) {
+        context.beginPath();
+        context.moveTo(cx + dx, cy - size * 0.28);
+        context.lineTo(cx + dx, cy + size * 0.12);
+        context.moveTo(cx + dx - size * 0.08, cy + size * 0.02);
+        context.lineTo(cx + dx, cy + size * 0.18);
+        context.lineTo(cx + dx + size * 0.08, cy + size * 0.02);
+        context.stroke();
+      }
+      break;
+    }
+    case FREEZE: {
+      for (let i = 0; i < 3; i++) {
+        const angle = (Math.PI / 3) * i;
+        context.beginPath();
+        context.moveTo(cx - Math.cos(angle) * size * 0.3, cy - Math.sin(angle) * size * 0.3);
+        context.lineTo(cx + Math.cos(angle) * size * 0.3, cy + Math.sin(angle) * size * 0.3);
+        context.stroke();
+      }
+      break;
+    }
+  }
+  context.globalAlpha = 1;
+}
+
 function drawGrid() {
   ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
   ctx.lineWidth = 0.5;
@@ -222,6 +449,19 @@ function draw() {
     for (let c = 0; c < COLS; c++)
       if (!board[r][c] && isNutRing(r, c)) drawNutHole(ctx, c, r, BLOCK);
 
+  // marco pulsante sobre los comodines (tinte)
+  const pulse = 0.35 + 0.35 * Math.abs(Math.sin(performance.now() / 300));
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!wild[r][c]) continue;
+      ctx.globalAlpha = pulse;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS[DYE];
+      ctx.strokeRect(c * BLOCK + 2, r * BLOCK + 2, BLOCK - 4, BLOCK - 4);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // ghost
   const gy = ghostY();
   for (let r = 0; r < current.shape.length; r++)
@@ -229,12 +469,31 @@ function draw() {
       if (current.shape[r][c])
         drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
   if (current.type === NUT) drawNutHole(ctx, current.x + 1, gy + 1, BLOCK, 0.2);
+  if (isPowerup(current.type)) drawPowerIcon(ctx, current.x, gy, current.type, BLOCK, 0.2);
 
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
   if (current.type === NUT) drawNutHole(ctx, current.x + 1, current.y + 1, BLOCK);
+  if (isPowerup(current.type)) drawPowerIcon(ctx, current.x, current.y, current.type, BLOCK);
+
+  // aviso de efecto activado
+  if (toastUntil && performance.now() < toastUntil) {
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText(toastText, canvas.width / 2, 24);
+  }
+
+  // contador de congelación activa
+  if (freezeRemaining > 0) {
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COLORS[FREEZE];
+    ctx.fillText(`❄ ${(freezeRemaining / 1000).toFixed(1)}s`, canvas.width / 2, canvas.height - 10);
+  }
+  ctx.textAlign = 'start';
 }
 
 // Comprueba si una celda vacía del tablero está rodeada por los 8 vecinos de una tuerca,
@@ -260,6 +519,7 @@ function drawNext() {
     for (let c = 0; c < shape[r].length; c++)
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
   if (next.type === NUT) drawNutHole(nextCtx, offX + 1, offY + 1, NB);
+  if (isPowerup(next.type)) drawPowerIcon(nextCtx, offX, offY, next.type, NB);
 }
 
 function endGame() {
@@ -291,13 +551,18 @@ function loop(ts) {
   if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
-  dropAccum += dt;
-  if (dropAccum >= dropInterval) {
+  if (freezeRemaining > 0) {
+    freezeRemaining = Math.max(0, freezeRemaining - dt);
     dropAccum = 0;
-    if (!collide(current.shape, current.x, current.y + 1)) {
-      current.y++;
-    } else {
-      lockPiece();
+  } else {
+    dropAccum += dt;
+    if (dropAccum >= dropInterval) {
+      dropAccum = 0;
+      if (!collide(current.shape, current.x, current.y + 1)) {
+        current.y++;
+      } else {
+        lockPiece();
+      }
     }
   }
   draw();
@@ -307,6 +572,7 @@ function loop(ts) {
 
 function init() {
   board = createBoard();
+  wild = createMatrix(false);
   score = 0;
   lines = 0;
   level = 1;
@@ -314,6 +580,11 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  freezeRemaining = 0;
+  pendingPowerup = false;
+  nextPowerupAt = POWERUP_EVERY;
+  toastText = '';
+  toastUntil = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
