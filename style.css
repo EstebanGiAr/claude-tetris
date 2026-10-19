@@ -277,6 +277,11 @@ kbd {
   border-radius: 4px;
 }
 
+#hold-section.used #hold-canvas {
+  opacity: 0.4;
+  filter: grayscale(0.6);
+}
+
 #ability-title {
   font-size: 20px;
   font-weight: 800;

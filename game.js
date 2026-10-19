@@ -91,7 +91,6 @@ const ABILITIES = [
   { id: 'swap', name: 'INTERCAMBIO', desc: 'Cambia la pieza actual por otra al azar' },
   { id: 'slow', name: 'RALENTIZAR', desc: 'La caída se ralentiza 10s' },
   { id: 'undo', name: 'DESHACER', desc: 'Deshace tu última colocación' },
-  { id: 'hold', name: 'RESERVA', desc: 'Desbloquea la tecla de reserva (hold) para el resto de la partida' },
 ];
 
 const PIECES = [
@@ -167,7 +166,7 @@ let combo, maxCombo, b2b, lastActionWasRotate;
 let flashColor, flashUntil, shakeUntil, bigText, bigUntil;
 let audioCtx, muted;
 let challenge, elapsed, garbageAccum, settled, revealUntil, inMenu;
-let energy, abilityMenuOpen, upcoming, hold, holdUnlocked, holdUsed, slowRemaining, queuePreviewUntil, lastLockSnapshot;
+let energy, abilityMenuOpen, upcoming, hold, holdUsed, slowRemaining, queuePreviewUntil, lastLockSnapshot;
 
 function createMatrix(fill) {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(fill));
@@ -599,7 +598,7 @@ function freeze() {
 function spawn() {
   current = next;
   lastActionWasRotate = false; // la pieza nueva aún no se movió ni rotó
-  holdUsed = false; // cada pieza nueva puede reservarse una vez (si el hold está desbloqueado)
+  holdUsed = false; // cada pieza nueva puede reservarse una vez
   next = makePiece(upcoming.shift());
   upcoming.push(randomPieceType());
   if (collide(current.shape, current.x, current.y)) {
@@ -608,6 +607,7 @@ function spawn() {
     return;
   }
   drawNext();
+  drawHold();
 }
 
 // Reto "tablero sucio": rellena las `n` filas inferiores con bloques fijos,
@@ -750,11 +750,6 @@ function activateAbility(id) {
     case 'undo':
       undoLastLock();
       break;
-    case 'hold':
-      holdUnlocked = true;
-      drawHold();
-      showToast('RESERVA DESBLOQUEADA');
-      break;
   }
   closeAbilityMenu();
 }
@@ -805,10 +800,10 @@ function undoLastLock() {
   showToast('DESHECHO');
 }
 
-// Habilidad "Reserva": tecla C para guardar/intercambiar la pieza actual con el slot de hold.
-// Solo disponible una vez desbloqueada, y una vez por pieza (como en el Tetris estándar).
+// Reserva (hold): tecla C para guardar/intercambiar la pieza actual con el slot de hold.
+// Disponible desde el inicio de la partida; solo una vez por pieza (como en el Tetris estándar).
 function holdSwap() {
-  if (!holdUnlocked || holdUsed || paused || gameOver || abilityMenuOpen) return;
+  if (holdUsed || paused || gameOver || abilityMenuOpen) return;
   holdUsed = true;
   const curType = current.type;
   if (hold == null) {
@@ -833,6 +828,7 @@ function holdSwap() {
 
 function drawHold() {
   const HB = 18;
+  holdSection.classList.toggle('used', holdUsed);
   holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
   if (hold == null) return;
   const shape = PIECES[hold];
@@ -880,7 +876,6 @@ function updateHUD() {
   }
   energyFill.style.width = `${energy}%`;
   energyFill.classList.toggle('full', energy >= ENERGY_MAX);
-  holdSection.classList.toggle('hidden', !holdUnlocked);
   updateGoalHUD();
 }
 
@@ -1280,13 +1275,12 @@ function init(ch) {
   energy = 0;
   abilityMenuOpen = false;
   hold = null;
-  holdUnlocked = false;
   holdUsed = false;
   slowRemaining = 0;
   queuePreviewUntil = 0;
   lastLockSnapshot = null;
   upcoming = Array.from({ length: UPCOMING_SIZE }, () => randomPieceType());
-  holdSection.classList.add('hidden');
+  holdSection.classList.remove('hidden');
   queueSection.classList.add('hidden');
   abilityOverlay.classList.add('hidden');
   drawHold();
@@ -1433,7 +1427,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (abilityMenuOpen) {
-    const digit = e.code.match(/^Digit([1-5])$/);
+    const digit = e.code.match(/^Digit([1-4])$/);
     if (digit) abilityList.children[Number(digit[1]) - 1]?.click();
     return;
   }
@@ -1441,7 +1435,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyP') { togglePause(); return; }
   if (e.code === 'KeyM') { toggleMute(); return; }
   if (paused || gameOver) return;
-  if (e.code === 'KeyC') { holdSwap(); return; }
+  if (e.code === 'KeyC' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') { holdSwap(); return; }
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) { current.x--; markAction('move'); }
