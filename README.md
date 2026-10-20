@@ -90,10 +90,11 @@ Después abre `http://localhost:8000` en el navegador.
 | `↑` o `X` | Rotar la pieza en sentido horario |
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| `P` / `Esc` | Abrir / cerrar el menú de pausa  |
 | `M`       | Silenciar / activar sonido        |
-| `Esc`     | Volver al menú de modos           |
 | `1`–`6`   | Elegir modo en el menú            |
+
+El menú de pausa (`P` o `Esc`) bloquea el resto del input del juego y ofrece **Reanudar**, **Reiniciar**, **Menú principal**, un resumen de controles y un selector de **nivel inicial** (1–15) que se aplica a la siguiente partida y se recuerda entre sesiones.
 
 ---
 
@@ -109,7 +110,7 @@ Al cargar la página aparece un menú para elegir entre **CLÁSICO** (el modo li
 | **Piezas invisibles**   | Limpiar 15 líneas mientras los bloques fijos se desvanecen poco después de asentarse (vuelven a verse un instante tras cada línea limpiada). |
 | **Rotación inversa**    | Limpiar 30 líneas; desde el nivel 3 la rotación gira al revés. |
 
-Al terminar un desafío (ganado, perdido o por tiempo agotado) se muestra el resultado y, si corresponde, el récord guardado en `localStorage` (mejor tiempo de completado, o mayor tiempo sobrevivido en "Basura ascendente"). Desde el overlay de fin de partida se puede reintentar el mismo modo o volver al menú con el botón **Menú** o la tecla `Esc`.
+Al terminar un desafío (ganado, perdido o por tiempo agotado) se muestra el resultado y, si corresponde, el récord guardado en `localStorage` (mejor tiempo de completado, o mayor tiempo sobrevivido en "Basura ascendente"). Desde el overlay de fin de partida se puede reintentar el mismo modo o volver al menú con el botón **Menú**.
 
 ---
 

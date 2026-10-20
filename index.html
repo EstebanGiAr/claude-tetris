@@ -62,7 +62,7 @@
             <li><kbd>P</kbd> pausa</li>
             <li><kbd>M</kbd> sonido</li>
             <li><kbd>C</kbd> / <kbd>Shift</kbd> reservar pieza</li>
-            <li><kbd>Esc</kbd> menú</li>
+            <li><kbd>Esc</kbd> pausa</li>
           </ul>
         </details>
 
@@ -135,6 +135,36 @@
         <p id="ability-title">¡HABILIDAD LISTA!</p>
         <p class="ability-sub">Elige una (1-5)</p>
         <div id="ability-list"></div>
+      </div>
+    </div>
+
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="overlay-box menu-box pause-box">
+        <p id="pause-title">PAUSA</p>
+        <div class="overlay-actions">
+          <button id="pause-resume-btn" type="button">Reanudar</button>
+          <button id="pause-restart-btn" type="button">Reiniciar</button>
+        </div>
+        <button id="pause-main-menu-btn" type="button" class="menu-card pause-main-menu-btn">Menú principal</button>
+
+        <div class="panel-section pause-start-level">
+          <label class="label" for="start-level-select">NIVEL INICIAL</label>
+          <select id="start-level-select"></select>
+        </div>
+
+        <details class="panel-section legend controls pause-controls">
+          <summary class="label">VER CONTROLES</summary>
+          <ul>
+            <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+            <li><kbd>↑</kbd> rotar</li>
+            <li><kbd>↓</kbd> bajar</li>
+            <li><kbd>Space</kbd> caída</li>
+            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>M</kbd> sonido</li>
+            <li><kbd>C</kbd> / <kbd>Shift</kbd> reservar pieza</li>
+            <li><kbd>Esc</kbd> pausa</li>
+          </ul>
+        </details>
       </div>
     </div>
   </div>

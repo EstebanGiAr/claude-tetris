@@ -517,6 +517,47 @@ details.legend[open] {
   color: var(--accent);
 }
 
+/* ---- Menú de pausa ---- */
+.pause-box {
+  max-width: 280px;
+}
+
+#pause-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+
+.pause-main-menu-btn {
+  text-align: center;
+  align-items: center;
+}
+
+.pause-start-level {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+}
+
+#start-level-select {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pause-controls {
+  width: 100%;
+  text-align: left;
+}
+
 /* ---- Pantallas bajas: ceder altura del título al tablero ---- */
 @media (max-height: 640px) {
   :root {
