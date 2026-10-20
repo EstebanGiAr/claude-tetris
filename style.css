@@ -528,3 +528,128 @@ details.legend[open] {
     letter-spacing: 4px;
   }
 }
+
+/* ---- Tabla de récords por puntuación (top 5) ---- */
+#overlay-score-table,
+#menu-score-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--kbd-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.score-row.highlight {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--kbd-bg));
+}
+
+.score-row-rank {
+  color: var(--muted);
+  width: 1.4em;
+  flex-shrink: 0;
+}
+
+.score-row-name {
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-row-score {
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--accent);
+}
+
+.score-row-mode {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.score-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+#highscore-entry {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+#highscore-entry.hidden {
+  display: none;
+}
+
+#name-input {
+  flex: 1;
+  background: var(--kbd-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+#name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#save-score-btn {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#save-score-btn:hover {
+  background: var(--accent-hover);
+}
+
+.score-stats {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#reset-scores-btn {
+  background: var(--kbd-bg);
+  color: var(--danger);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+#reset-scores-btn:hover {
+  border-color: var(--danger);
+}

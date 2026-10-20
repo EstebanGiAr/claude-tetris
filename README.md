@@ -48,6 +48,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
 - **Modo desafío** con 5 retos de objetivo y tiempo (ver [Modo desafío](#modo-desafío)), con récords guardados en `localStorage`.
+- **Tabla de récords local (top 5)**: guarda las mejores puntuaciones con nombre del jugador en `localStorage`, visible en la pantalla de inicio y en el game over (resaltando si la partida actual entra en el top), junto con el mejor combo y las máximas líneas conseguidas; incluye botón para resetear los récords.
 
 ---
 

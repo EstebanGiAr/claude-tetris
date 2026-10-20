@@ -153,10 +153,18 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const overlayCombo = document.getElementById('overlay-combo');
 const overlayRecord = document.getElementById('overlay-record');
+const highscoreEntry = document.getElementById('highscore-entry');
+const nameInput = document.getElementById('name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
+const overlayScoreTable = document.getElementById('overlay-score-table');
 const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const menuOverlay = document.getElementById('menu-overlay');
 const menuList = document.getElementById('menu-list');
+const menuScoreTable = document.getElementById('menu-score-table');
+const bestComboStat = document.getElementById('best-combo-stat');
+const maxLinesStat = document.getElementById('max-lines-stat');
+const resetScoresBtn = document.getElementById('reset-scores-btn');
 const themeToggle = document.getElementById('theme-toggle');
 const soundToggle = document.getElementById('sound-toggle');
 
@@ -677,6 +685,93 @@ function saveRecord(id, ms, { higherIsBetter } = {}) {
   return better;
 }
 
+// --- Tabla de récords por puntuación (top 5), sistema independiente del de
+// récords por desafío (getRecords/saveRecord/'tetris-records' arriba). Usa su
+// propia clave 'tetris-highscores' y no debe mezclarse con aquel.
+
+function getHighScores() {
+  try {
+    const list = JSON.parse(localStorage.getItem('tetris-highscores'));
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// true si la puntuación entraría en el top 5 actual (menos de 5 guardadas, o
+// supera a la más baja del top).
+function qualifiesForTop(score) {
+  const list = getHighScores();
+  if (list.length < 5) return true;
+  return score > list[list.length - 1].score;
+}
+
+// Inserta una entrada { name, score, lines, maxCombo, level, mode, date },
+// reordena por puntuación descendente, recorta a 5 y guarda. Devuelve el
+// índice (0-4) donde quedó la entrada nueva, o -1 si no entró en el top.
+function addHighScore(entry) {
+  const list = getHighScores();
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  list.length = Math.min(list.length, 5);
+  try { localStorage.setItem('tetris-highscores', JSON.stringify(list)); } catch (e) {}
+  return list.indexOf(entry);
+}
+
+function resetHighScores() {
+  try { localStorage.setItem('tetris-highscores', JSON.stringify([])); } catch (e) {}
+}
+
+// Mejor combo y máximas líneas vistas entre todas las entradas guardadas.
+function bestStats() {
+  const list = getHighScores();
+  let bestCombo = 0;
+  let maxLines = 0;
+  list.forEach(entry => {
+    if (entry.maxCombo > bestCombo) bestCombo = entry.maxCombo;
+    if (entry.lines > maxLines) maxLines = entry.lines;
+  });
+  return { bestCombo, maxLines };
+}
+
+// Pinta las filas del top 5 dentro de `container`; resalta `highlightIndex`
+// (0-4) si se pasa, para marcar visualmente una entrada recién conseguida.
+function renderScoreTable(container, highlightIndex = -1) {
+  if (!container) return;
+  const list = getHighScores();
+  container.innerHTML = '';
+  if (list.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'score-empty';
+    empty.textContent = 'Sin récords aún';
+    container.appendChild(empty);
+    return;
+  }
+  list.forEach((entry, i) => {
+    const row = document.createElement('div');
+    row.className = 'score-row' + (i === highlightIndex ? ' highlight' : '');
+
+    const rank = document.createElement('span');
+    rank.className = 'score-row-rank';
+    rank.textContent = `${i + 1}.`;
+
+    const name = document.createElement('span');
+    name.className = 'score-row-name';
+    name.textContent = entry.name; // textContent: nunca se interpreta como HTML (nombre viene del jugador)
+
+    const scoreEl = document.createElement('span');
+    scoreEl.className = 'score-row-score';
+    scoreEl.textContent = entry.score.toLocaleString();
+
+    const mode = document.createElement('span');
+    mode.className = 'score-row-mode';
+    mode.textContent = entry.mode || '';
+
+    row.append(rank, name, scoreEl, mode);
+    container.appendChild(row);
+  });
+}
+
 // Revisa si el desafío actual se ganó o se perdió por tiempo; se llama tras
 // cada limpieza de línea y en cada frame del bucle principal.
 function checkChallenge() {
@@ -1176,7 +1271,25 @@ function endGame(outcome = 'lose') {
     }
   }
 
+  // Tabla de récords por puntuación (sistema independiente del de récords por
+  // desafío de arriba): si la puntuación entra en el top 5, se pide el nombre;
+  // si no, solo se muestra la tabla actual sin resaltar nada.
+  const qualifies = qualifiesForTop(score);
+  if (qualifies) {
+    highscoreEntry.classList.remove('hidden');
+    let lastName = '';
+    try { lastName = localStorage.getItem('tetris-last-name') || ''; } catch (e) {}
+    nameInput.value = lastName;
+    overlayScoreTable.innerHTML = '';
+  } else {
+    highscoreEntry.classList.add('hidden');
+    renderScoreTable(overlayScoreTable, -1);
+  }
+
   overlay.classList.remove('hidden');
+  // El input solo puede recibir foco una vez que el overlay deja de ser
+  // display:none (focus() en un nodo oculto no hace nada).
+  if (qualifies) nameInput.focus();
   if (outcome === 'win') playWin(); else playGameOver();
 }
 
@@ -1192,6 +1305,8 @@ function togglePause() {
     overlayScore.textContent = '';
     overlayCombo.textContent = '';
     overlayRecord.textContent = '';
+    highscoreEntry.classList.add('hidden');
+    overlayScoreTable.innerHTML = '';
     overlay.classList.remove('hidden');
   }
 }
@@ -1319,6 +1434,18 @@ function renderMenu() {
     card.addEventListener('click', () => init(ch));
     menuList.appendChild(card);
   });
+
+  renderMenuScoreStats();
+}
+
+// Tabla de récords por puntuación (top 5) + stats agregadas en la pantalla de
+// inicio, sin resaltado (no hay una entrada "recién conseguida" aquí). La usan
+// renderMenu() y el handler de #reset-scores-btn tras borrar los récords.
+function renderMenuScoreStats() {
+  renderScoreTable(menuScoreTable, -1);
+  const { bestCombo, maxLines } = bestStats();
+  bestComboStat.textContent = `Mejor combo: x${bestCombo}`;
+  maxLinesStat.textContent = `Máx. líneas: ${maxLines}`;
 }
 
 function showMenu() {
@@ -1420,6 +1547,10 @@ try { savedMuted = localStorage.getItem('tetris-muted') === '1'; } catch (e) {}
 setMuted(savedMuted);
 
 document.addEventListener('keydown', e => {
+  // Mientras el jugador escribe su nombre (input de récords), ninguna tecla
+  // del juego debe interferir (Escape/P/M incluidas: "p"/"m" en un nombre no
+  // deben pausar ni silenciar).
+  if (e.target.tagName === 'INPUT') return;
   ensureAudio(); // primer gesto del usuario: habilita el audio (política de autoplay)
   if (inMenu) {
     const digit = e.code.match(/^Digit([1-9])$/);
@@ -1460,6 +1591,48 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', () => init(challenge));
 menuBtn.addEventListener('click', showMenu);
+
+// Guardar puntuación en el top 5 al game over (solo visible si qualifiesForTop).
+saveScoreBtn.addEventListener('click', () => {
+  const name = nameInput.value.trim() || 'Jugador';
+  try { localStorage.setItem('tetris-last-name', name); } catch (e) {}
+  const entry = {
+    name,
+    score,
+    lines,
+    maxCombo,
+    level,
+    mode: challenge ? challenge.name : 'CLÁSICO',
+    date: new Date().toISOString(),
+  };
+  const idx = addHighScore(entry);
+  highscoreEntry.classList.add('hidden');
+  renderScoreTable(overlayScoreTable, idx);
+  saveScoreBtn.blur();
+});
+
+// Reseteo de récords con confirmación en dos clics (sin usar confirm(), que
+// bloquearía el canvas): el primer click arma una ventana de ~3s en la que un
+// segundo click confirma el borrado; si expira, vuelve al texto original.
+let resetScoresArmed = false;
+let resetScoresTimeout = null;
+resetScoresBtn.addEventListener('click', () => {
+  if (!resetScoresArmed) {
+    resetScoresArmed = true;
+    resetScoresBtn.textContent = '¿Seguro? Click de nuevo';
+    resetScoresTimeout = setTimeout(() => {
+      resetScoresArmed = false;
+      resetScoresBtn.textContent = 'Resetear récords';
+    }, 3000);
+  } else {
+    clearTimeout(resetScoresTimeout);
+    resetScoresArmed = false;
+    resetHighScores();
+    renderMenuScoreStats();
+    resetScoresBtn.textContent = 'Resetear récords';
+  }
+  resetScoresBtn.blur();
+});
 
 // Tema: oscuro por defecto, el usuario puede cambiar a claro (se recuerda en localStorage)
 function applyTheme(theme) {

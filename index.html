@@ -116,6 +116,11 @@
         <p id="overlay-score"></p>
         <p id="overlay-combo"></p>
         <p id="overlay-record"></p>
+        <div id="highscore-entry" class="hidden">
+          <input id="name-input" maxlength="10" placeholder="Tu nombre" />
+          <button id="save-score-btn" type="button">Guardar</button>
+        </div>
+        <div id="overlay-score-table"></div>
         <div class="overlay-actions">
           <button id="restart-btn">Reiniciar</button>
           <button id="menu-btn">Menú</button>
@@ -127,6 +132,12 @@
       <div class="overlay-box menu-box">
         <p id="menu-title">ELIGE MODO</p>
         <div id="menu-list"></div>
+        <div id="menu-score-table"></div>
+        <div class="score-stats">
+          <span id="best-combo-stat"></span>
+          <span id="max-lines-stat"></span>
+        </div>
+        <button id="reset-scores-btn" type="button">Resetear récords</button>
       </div>
     </div>
 
