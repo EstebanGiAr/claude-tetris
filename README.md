@@ -48,6 +48,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
 - **Modo desafío** con 5 retos de objetivo y tiempo (ver [Modo desafío](#modo-desafío)), con récords guardados en `localStorage`.
+- **Selector de skins visuales** (Retro, Neon, Pastel, Pixel art) que cambia la apariencia de todos los bloques al instante, sin recargar la página; la elección se recuerda en `localStorage`.
 
 ---
 

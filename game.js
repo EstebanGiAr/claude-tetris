@@ -4,7 +4,7 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
+let COLORS = [
   null,
   '#4dd0e1', // I - cyan
   '#ffd54f', // O - yellow
@@ -25,6 +25,39 @@ const COLORS = [
   '#ffee58', // single 1x1 - amarillo brillante
   '#757575', // basura (modo desafío) - gris oscuro
 ];
+
+// --- Skins visuales (ver CLAUDE.md) ---
+// Cada paleta mantiene el mismo orden/índices que la paleta "retro" original
+// (null + 1-7 piezas, 8 tuerca, 9-13 powerups, 14-17 pentominós/single, 18 basura).
+const SKIN_PALETTES = {
+  retro: [
+    null,
+    '#4dd0e1', '#ffd54f', '#ba68c8', '#81c784', '#e57373', '#90caf9', '#ffb74d',
+    '#b0bec5',
+    '#ef5350', '#fff176', '#f06292', '#4db6ac', '#80d8ff',
+    '#aed581', '#9575cd', '#4fc3f7', '#ffee58',
+    '#757575',
+  ],
+  neon: [
+    null,
+    '#00e5ff', '#ffea00', '#e040fb', '#00e676', '#ff1744', '#448aff', '#ff9100',
+    '#cfd8dc',
+    '#ff1744', '#ffea00', '#ff4081', '#1de9b6', '#18ffff',
+    '#76ff03', '#d500f9', '#00b0ff', '#ffff00',
+    '#9e9e9e',
+  ],
+  pastel: [
+    null,
+    '#b2ebf2', '#fff3b0', '#e1bee7', '#c8e6c9', '#ffcdd2', '#bbdefb', '#ffe0b2',
+    '#cfd8dc',
+    '#ffcdd2', '#fff9c4', '#f8bbd0', '#b2dfdb', '#b3e5fc',
+    '#dcedc8', '#d1c4e9', '#b3e5fc', '#fff9c4',
+    '#bdbdbd',
+  ],
+};
+// La skin "pixel" usa la misma paleta que "retro": su diferencia es la
+// textura de checkerboard dibujada en drawBlock(), no el color.
+SKIN_PALETTES.pixel = SKIN_PALETTES.retro;
 
 const NUT = 8; // tipo de pieza "tuerca" (reto): anillo con agujero central
 
@@ -159,6 +192,9 @@ const menuOverlay = document.getElementById('menu-overlay');
 const menuList = document.getElementById('menu-list');
 const themeToggle = document.getElementById('theme-toggle');
 const soundToggle = document.getElementById('sound-toggle');
+const skinSelect = document.getElementById('skin-select');
+
+let currentSkin = 'retro';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let wild, freezeRemaining, pendingPowerup, nextPowerupAt, toastText, toastUntil, toastColor;
@@ -909,12 +945,65 @@ function fadeAlpha(ts, now) {
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
   const color = COLORS[colorIndex];
+  const px = x * size + 1, py = y * size + 1, w = size - 2, h = size - 2;
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+
+  switch (currentSkin) {
+    case 'neon': {
+      context.shadowColor = color;
+      context.shadowBlur = 12;
+      context.fillStyle = '#0a0a0a';
+      context.fillRect(px, py, w, h);
+      context.strokeStyle = color;
+      context.lineWidth = 2;
+      context.strokeRect(px + 1, py + 1, w - 2, h - 2);
+      context.shadowBlur = 0;
+      context.fillStyle = 'rgba(255,255,255,0.18)';
+      context.fillRect(px, py, w, 4);
+      break;
+    }
+    case 'pastel': {
+      const radius = Math.min(6, w / 4, h / 4);
+      context.beginPath();
+      if (typeof context.roundRect === 'function') {
+        context.roundRect(px, py, w, h, radius);
+      } else {
+        context.rect(px, py, w, h);
+      }
+      context.fillStyle = color;
+      context.fill();
+      context.fillStyle = 'rgba(255,255,255,0.18)';
+      context.fillRect(px, py, w, 4);
+      break;
+    }
+    case 'pixel': {
+      context.fillStyle = color;
+      context.fillRect(px, py, w, h);
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(px, py, w, 4);
+      // textura tipo checkerboard 2x2 superpuesta sobre el bloque
+      const half = size / 2;
+      for (let gy = 0; gy < 2; gy++) {
+        for (let gx = 0; gx < 2; gx++) {
+          if ((gx + gy) % 2 === 0) continue;
+          context.fillStyle = 'rgba(0,0,0,0.08)';
+          context.fillRect(px + gx * half, py + gy * half, Math.min(half, w - gx * half), Math.min(half, h - gy * half));
+        }
+      }
+      break;
+    }
+    default: {
+      // retro
+      context.fillStyle = color;
+      context.fillRect(px, py, w, h);
+      // highlight
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(px, py, w, 4);
+      break;
+    }
+  }
+
+  context.shadowBlur = 0;
   context.globalAlpha = 1;
 }
 
@@ -1474,8 +1563,34 @@ themeToggle.addEventListener('click', () => {
   themeToggle.blur(); // evita que Space (caída) active el botón
 });
 
+// Skin visual: retro/neon/pastel/pixel, se recuerda en localStorage (ver CLAUDE.md)
+function applySkin(id) {
+  if (!SKIN_PALETTES[id]) id = 'retro';
+  currentSkin = id;
+  COLORS = SKIN_PALETTES[id];
+  document.documentElement.dataset.skin = id;
+  if (skinSelect) skinSelect.value = id;
+  try { localStorage.setItem('tetris-skin', id); } catch (e) {}
+  if (current) { draw(); drawNext(); drawHold(); } // redibuja todos los canvases al vuelo
+}
+
+if (skinSelect) {
+  skinSelect.addEventListener('change', () => {
+    applySkin(skinSelect.value);
+    skinSelect.blur(); // evita que las flechas/Space del juego interactúen con el <select> enfocado
+  });
+}
+
 let savedTheme = 'dark';
 try { savedTheme = localStorage.getItem('tetris-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
 
 applyTheme(savedTheme);
+
+let savedSkin = 'retro';
+try {
+  const stored = localStorage.getItem('tetris-skin');
+  if (stored && SKIN_PALETTES[stored]) savedSkin = stored;
+} catch (e) {}
+
+applySkin(savedSkin);
 showMenu();
