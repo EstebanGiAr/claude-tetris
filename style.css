@@ -205,6 +205,32 @@ body {
   border-color: var(--accent);
 }
 
+/* ---- Skins visuales (ver CLAUDE.md) ---- */
+#skin-select {
+  align-self: flex-start;
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#skin-select:hover {
+  border-color: var(--accent);
+}
+
+:root[data-skin="neon"] {
+  --canvas-bg: #050507;
+  --grid: #10121a;
+}
+
+:root[data-skin="pastel"] {
+  --canvas-bg: #fbf6f2;
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
